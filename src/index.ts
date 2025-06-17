@@ -7,6 +7,9 @@ import { MigratingAgent } from './agents/MigratingAgent';
 import { EchoAgent } from './agents/EchoAgent';
 import { StreamingAgent } from './agents/StreamingAgent';
 import { ChattyAgent } from './agents/ChattyAgent';
+import { ReminderAgent } from './agents/ReminderAgent';
+import { ScheduleManagerAgent } from './agents/ScheduleManagerAgent';
+import { OnboardingAgent } from './agents/OnboardingAgent';
 // Export the Env type for use in Agent classes
 export type { WorkerEnv } from './types';
 import type { WorkerEnv } from './types';
@@ -195,6 +198,30 @@ export default {
         return agent.onRequest(request);
       }
 
+      // Handle reminder agent
+      if (path.startsWith('/agent/reminder-agent/')) {
+        const pathParts = path.split('/');
+        const agentId = pathParts[3];
+        const agent = await getAgentByName<WorkerEnv, ReminderAgent>(env.REMINDER_AGENT, agentId);
+        return agent.onRequest(request);
+      }
+
+      // Handle schedule manager agent
+      if (path.startsWith('/agent/schedule-manager-agent/')) {
+        const pathParts = path.split('/');
+        const agentId = pathParts[3];
+        const agent = await getAgentByName<WorkerEnv, ScheduleManagerAgent>(env.SCHEDULE_MANAGER_AGENT, agentId);
+        return agent.onRequest(request);
+      }
+
+      // Handle onboarding agent
+      if (path.startsWith('/agent/onboarding-agent/')) {
+        const pathParts = path.split('/');
+        const agentId = pathParts[3];
+        const agent = await getAgentByName<WorkerEnv, OnboardingAgent>(env.ONBOARDING_AGENT, agentId);
+        return agent.onRequest(request);
+      }
+
       return new Response("Not Found", { status: 404 });
     } catch (error) {
       console.error('Worker error:', error);
@@ -213,3 +240,7 @@ export { MigratingAgent } from './agents/MigratingAgent';
 export { EchoAgent } from './agents/EchoAgent';
 export { StreamingAgent } from './agents/StreamingAgent';
 export { ChattyAgent } from './agents/ChattyAgent';
+export { ReminderAgent } from './agents/ReminderAgent';
+export { ScheduleManagerAgent } from './agents/ScheduleManagerAgent';
+export { OnboardingAgent } from './agents/OnboardingAgent';
+export { EmailWorkflow } from './workflows/EmailWorkflow';
