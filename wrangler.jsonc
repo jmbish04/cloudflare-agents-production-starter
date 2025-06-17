@@ -68,9 +68,26 @@
       {
         "name": "PAYMENT_AGENT_V1",
         "class_name": "PaymentAgentV1"
+      },
+      {
+        "name": "RAG_AGENT",
+        "class_name": "RAGAgent"
+      },
+      {
+        "name": "ROUTING_AGENT",
+        "class_name": "RoutingAgent"
       }
     ]
   },
+  "ai": {
+    "binding": "AI"
+  },
+  "vectorize": [
+    {
+      "binding": "VECTOR_DB",
+      "index_name": "vector-index"
+    }
+  ],
   "workflows": [
     {
       "name": "EMAIL_WORKFLOW",
@@ -117,6 +134,12 @@
         "UserAgentV1",
         "UserAgentV2",
         "PaymentAgentV1"
+      ]
+    },
+    {
+      "tag": "v6",
+      "new_sqlite_classes": [
+        "RAGAgent"
       ]
     }
   ]

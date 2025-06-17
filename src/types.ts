@@ -15,6 +15,8 @@ import type { SupervisorAgent } from './agents/SupervisorAgent';
 import type { UserAgentV1 } from './agents/UserAgentV1';
 import type { UserAgentV2 } from './agents/UserAgentV2';
 import type { WorkerAgent } from './agents/WorkerAgent';
+import type { RAGAgent } from './agents/RAGAgent';
+import type { RoutingAgent } from './agents/RoutingAgent';
 
 export interface WorkerEnv {
   // Existing agents
@@ -36,6 +38,14 @@ export interface WorkerEnv {
   USER_AGENT_V1: AgentNamespace<UserAgentV1>;
   USER_AGENT_V2: AgentNamespace<UserAgentV2>;
   PAYMENT_AGENT_V1: AgentNamespace<PaymentAgentV1>;
+  
+  // AI agents
+  RAG_AGENT: AgentNamespace<RAGAgent>;
+  ROUTING_AGENT: AgentNamespace<RoutingAgent>;
+  
+  // AI services
+  AI: Ai;
+  VECTOR_DB: VectorizeIndex;
   
   // Secrets
   VALID_BEARER_TOKEN: string;

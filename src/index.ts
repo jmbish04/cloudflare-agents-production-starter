@@ -16,6 +16,8 @@ import { OnboardingAgent } from './agents/OnboardingAgent';
 import { UserAgentV1 } from './agents/UserAgentV1';
 import { UserAgentV2 } from './agents/UserAgentV2';
 import { PaymentAgentV1 } from './agents/PaymentAgentV1';
+import { RAGAgent } from './agents/RAGAgent';
+import { RoutingAgent } from './agents/RoutingAgent';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv } from './types';
 
@@ -130,6 +132,16 @@ app.get('/chatty-agent/:id', async (c) => {
   return new Response("Not Found", { status: 404 });
 });
 
+app.get('/routing-agent/:id', async (c) => {
+  if (c.req.header('upgrade') === 'websocket') {
+    const agentId = c.req.param('id');
+    return setupWebSocket(c.env, c.env.ROUTING_AGENT, agentId, RoutingAgent);
+  }
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, RoutingAgent>(c.env.ROUTING_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
 // Core API routes
 app.get('/agent/my-agent/:id', async (c) => {
   const agentId = c.req.param('id');
@@ -228,6 +240,19 @@ app.all('/agent/onboarding-agent/:id/*', async (c) => {
   return agent.onRequest(c.req.raw);
 });
 
+// AI agents
+app.all('/agent/rag-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, RAGAgent>(c.env.RAG_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.all('/agent/routing-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, RoutingAgent>(c.env.ROUTING_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
 // Custom 404 handler to match original behavior
 app.notFound((c) => {
   return new Response("Not Found", { status: 404 });
@@ -258,4 +283,6 @@ export { AuthAgent } from './agents/AuthAgent';
 export { UserAgentV1 } from './agents/UserAgentV1';
 export { UserAgentV2 } from './agents/UserAgentV2';
 export { PaymentAgentV1 } from './agents/PaymentAgentV1';
+export { RAGAgent } from './agents/RAGAgent';
+export { RoutingAgent } from './agents/RoutingAgent';
 export { EmailWorkflow } from './workflows/EmailWorkflow';
