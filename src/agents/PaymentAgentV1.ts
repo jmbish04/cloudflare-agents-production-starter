@@ -17,7 +17,7 @@ export class PaymentAgentV1 extends Agent<WorkerEnv> {
     }
     
     return {
-      status: 'success',
+      status: 'charged_in_cents',
       paymentId,
       amountCents,
       timestamp: new Date().toISOString()

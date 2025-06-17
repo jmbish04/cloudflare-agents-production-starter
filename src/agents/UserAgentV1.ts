@@ -13,7 +13,7 @@ export class UserAgentV1 extends Agent<WorkerEnv> {
     return {
       version: "v1",
       id: userId,
-      message: `User profile for ${userId} (V1 API)`
+      message: "This is the V1 profile."
     };
   }
 
