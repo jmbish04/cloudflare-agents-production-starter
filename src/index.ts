@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { jwt } from 'hono/jwt';
 import { getAgentByName } from 'agents';
+import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import { AuthAgent } from './agents/AuthAgent';
 import { MyAgent } from './agents/MyAgent';
 import { SupervisorAgent } from './agents/SupervisorAgent';
@@ -20,6 +21,11 @@ import { RAGAgent } from './agents/RAGAgent';
 import { RoutingAgent } from './agents/RoutingAgent';
 import { GitHubAgent } from './agents/GitHubAgent';
 import { WebBrowserAgent } from './agents/WebBrowserAgent';
+import { HITLAgent } from './agents/HITLAgent';
+import { StatefulCalculatorAgent } from './agents/StatefulCalculatorAgent';
+import { PersistentCounterAgent } from './agents/PersistentCounterAgent';
+import { SecureMcpAgent } from './agents/SecureMcpAgent';
+import { handleAuthDefault } from './auth-handler';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv, BrowserRequestPayload } from './types';
 
@@ -132,6 +138,14 @@ app.get('/chatty-agent/:id', async (c) => {
 });
 app.get('/routing-agent/:id', createAgentRoute('ROUTING_AGENT', RoutingAgent, true));
 
+// HITL Agent routes
+app.post('/agent/hitl-agent/:id/execute-transaction', createAgentRoute('HITL_AGENT', HITLAgent));
+app.get('/agent/hitl-agent/:id', createAgentRoute('HITL_AGENT', HITLAgent, true));
+
+// MCP Agent routes
+app.get('/agent/stateful-calculator/:id', createAgentRoute('STATEFUL_CALCULATOR_AGENT', StatefulCalculatorAgent, true));
+app.get('/agent/persistent-counter/:id', createAgentRoute('PERSISTENT_COUNTER_AGENT', PersistentCounterAgent, true));
+
 // Core API routes
 app.get('/agent/my-agent/:id', async (c) => {
   const agentId = c.req.param('id');
@@ -229,7 +243,32 @@ app.onError((err, c) => {
   return new Response("Internal Server Error", { status: 500 });
 });
 
-export default app;
+// OAuth Provider for Secure MCP Server
+const oauthProvider = new OAuthProvider({
+  apiHandlers: {
+    '/sse': SecureMcpAgent.serveSSE('/sse'),
+    '/mcp': SecureMcpAgent.serve('/mcp'),
+  },
+  defaultHandler: handleAuthDefault,
+  authorizeEndpoint: "/authorize",
+  tokenEndpoint: "/token",
+});
+
+// Main export - check if this is an OAuth MCP route first
+export default {
+  async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    
+    // Check if this is an OAuth/MCP route
+    const mcpPaths = ['/authorize', '/token', '/sse', '/mcp', '/login', '/info'];
+    if (mcpPaths.some(path => url.pathname.startsWith(path)) || url.pathname === '/') {
+      return oauthProvider.fetch(request, env, ctx);
+    }
+    
+    // Otherwise, use the regular Hono app
+    return app.fetch(request, env, ctx);
+  }
+};
 
 // Re-export Agent classes for wrangler.jsonc to find them
 export { MyAgent } from './agents/MyAgent';
@@ -253,3 +292,7 @@ export { RoutingAgent } from './agents/RoutingAgent';
 export { GitHubAgent } from './agents/GitHubAgent';
 export { WebBrowserAgent } from './agents/WebBrowserAgent';
 export { EmailWorkflow } from './workflows/EmailWorkflow';
+export { HITLAgent } from './agents/HITLAgent';
+export { StatefulCalculatorAgent } from './agents/StatefulCalculatorAgent';
+export { PersistentCounterAgent } from './agents/PersistentCounterAgent';
+export { SecureMcpAgent } from './agents/SecureMcpAgent';

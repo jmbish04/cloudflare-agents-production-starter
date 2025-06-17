@@ -84,6 +84,22 @@
       {
         "name": "BROWSER_AGENT",
         "class_name": "WebBrowserAgent"
+      },
+      {
+        "name": "HITL_AGENT",
+        "class_name": "HITLAgent"
+      },
+      {
+        "name": "STATEFUL_CALCULATOR_AGENT",
+        "class_name": "StatefulCalculatorAgent"
+      },
+      {
+        "name": "PERSISTENT_COUNTER_AGENT",
+        "class_name": "PersistentCounterAgent"
+      },
+      {
+        "name": "SECURE_MCP_AGENT",
+        "class_name": "SecureMcpAgent"
       }
     ]
   },
@@ -158,6 +174,15 @@
       "new_sqlite_classes": [
         "GitHubAgent",
         "WebBrowserAgent"
+      ]
+    },
+    {
+      "tag": "v8",
+      "new_sqlite_classes": [
+        "HITLAgent",
+        "StatefulCalculatorAgent",
+        "PersistentCounterAgent",
+        "SecureMcpAgent"
       ]
     }
   ]
