@@ -5,6 +5,12 @@ import type { WorkerEnv } from './types';
 // Mock agents module
 vi.mock('agents', () => ({
   getAgentByName: vi.fn(),
+  routeAgentRequest: vi.fn(),
+  Agent: class MockAgent {},
+}));
+
+vi.mock('partyserver', () => ({
+  Connection: class MockConnection {},
 }));
 
 vi.mock('./agents/MyAgent', () => ({
@@ -17,6 +23,18 @@ vi.mock('./agents/SupervisorAgent', () => ({
 
 vi.mock('./agents/WorkerAgent', () => ({
   WorkerAgent: class MockWorkerAgent {},
+}));
+
+vi.mock('./agents/HistoryAgent', () => ({
+  HistoryAgent: class MockHistoryAgent {},
+}));
+
+vi.mock('./agents/CounterAgent', () => ({
+  CounterAgent: class MockCounterAgent {},
+}));
+
+vi.mock('./agents/MigratingAgent', () => ({
+  MigratingAgent: class MockMigratingAgent {},
 }));
 
 // Get mocked function
@@ -45,6 +63,9 @@ describe('Worker Integration Tests', () => {
       MY_AGENT: {} as any,
       SUPERVISOR: {} as any,
       WORKER: {} as any,
+      HISTORY_AGENT: {} as any,
+      COUNTER_AGENT: {} as any,
+      MIGRATING_AGENT: {} as any,
     };
     mockCtx = {
       waitUntil: vi.fn(),

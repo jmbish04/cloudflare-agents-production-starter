@@ -6,10 +6,14 @@
     "bindings": [
       { "name": "MY_AGENT", "class_name": "MyAgent" },
       { "name": "SUPERVISOR", "class_name": "SupervisorAgent" },
-      { "name": "WORKER", "class_name": "WorkerAgent" }
+      { "name": "WORKER", "class_name": "WorkerAgent" },
+      { "name": "HISTORY_AGENT", "class_name": "HistoryAgent" },
+      { "name": "COUNTER_AGENT", "class_name": "CounterAgent" },
+      { "name": "MIGRATING_AGENT", "class_name": "MigratingAgent" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["MyAgent", "SupervisorAgent", "WorkerAgent"] }
+    { "tag": "v1", "new_sqlite_classes": ["MyAgent", "SupervisorAgent", "WorkerAgent"] },
+    { "tag": "v2", "new_sqlite_classes": ["HistoryAgent", "CounterAgent", "MigratingAgent"] }
   ]
 }

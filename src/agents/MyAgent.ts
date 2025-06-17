@@ -31,7 +31,7 @@ export class MyAgent extends Agent<WorkerEnv, { config: object }> {
     
     // Example: fetch config from an external source on first start
     try {
-      const config = await fetch("https://api.example.com/config").then(r => r.json());
+      const config = await fetch("https://api.example.com/config").then(r => r.json()) as object;
       this.setState({ config });
     } catch (error) {
       // Fallback to default config
