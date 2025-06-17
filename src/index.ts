@@ -18,9 +18,9 @@ export default {
       const path = url.pathname;
 
       // Handle WebSocket upgrades for counter agent
-      if (path.startsWith('/counter-agent/') && request.headers.get('upgrade') === 'websocket') {
+      if ((path.startsWith('/counter-agent/') || path.startsWith('/agent/counter-agent/')) && request.headers.get('upgrade') === 'websocket') {
         const pathParts = path.split('/');
-        const agentId = pathParts[2];
+        const agentId = path.startsWith('/agent/') ? pathParts[3] : pathParts[2];
         const agent = await getAgentByName<WorkerEnv, CounterAgent>(env.COUNTER_AGENT, agentId);
         
         const webSocketPair = new WebSocketPair();
@@ -95,9 +95,9 @@ export default {
         return agent.onRequest(request);
       }
 
-      if (path.startsWith('/counter-agent/')) {
+      if (path.startsWith('/counter-agent/') || path.startsWith('/agent/counter-agent/')) {
         const pathParts = path.split('/');
-        const agentId = pathParts[2]; // /counter-agent/{id}/... 
+        const agentId = path.startsWith('/agent/') ? pathParts[3] : pathParts[2]; // /agent/counter-agent/{id} or /counter-agent/{id}
         const agent = await getAgentByName<WorkerEnv, CounterAgent>(env.COUNTER_AGENT, agentId);
         return agent.onRequest(request);
       }

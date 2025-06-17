@@ -5,7 +5,8 @@
   "scripts": {
     "test": "vitest",
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "register-agents": "node scripts/register-agents.js"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.38",

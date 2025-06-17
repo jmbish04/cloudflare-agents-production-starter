@@ -14,6 +14,19 @@ vi.mock('@ai-sdk/openai', () => ({
   createOpenAI: vi.fn().mockReturnValue({})
 }));
 
+// Mock the StreamingAgent to prevent cloudflare: imports
+vi.mock('../src/agents/StreamingAgent', () => ({
+  StreamingAgent: class MockStreamingAgent {
+    constructor(public env: any) {}
+    
+    async onRequest(request: Request) {
+      return new Response("data: test stream\n\n", {
+        headers: { "Content-Type": "text/event-stream" }
+      });
+    }
+  }
+}));
+
 describe("Communication Patterns", () => {
   describe("StreamingAgent SSE", () => {
     it("should create agent with mocked dependencies", async () => {

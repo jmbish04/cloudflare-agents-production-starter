@@ -1,4 +1,4 @@
-import { useAgent } from "agents/react";
+import { useCommandAgent } from "../hooks/useCommandAgent";
 import { useEffect, useState } from "react";
 
 const agentUrl = "wss://my-worker.example.com/agent/counter-agent/my-counter";
@@ -6,7 +6,7 @@ const agentUrl = "wss://my-worker.example.com/agent/counter-agent/my-counter";
 function Counter() {
   const [state, setState] = useState<{ counter: number }>({ counter: 0 });
   
-  const agent = useAgent({
+  const agent = useCommandAgent({
     agent: "counter-agent",
     name: "my-counter",
     onStateUpdate: (newState) => {
@@ -21,7 +21,7 @@ function Counter() {
   }, [agent]);
 
   const handleIncrement = () => {
-    agent.send(JSON.stringify({ op: "increment" }));
+    agent.sendCommand({ op: "increment" });
   };
 
   return (
