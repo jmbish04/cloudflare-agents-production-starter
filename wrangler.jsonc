@@ -1,0 +1,15 @@
+{
+  "name": "core-agent-model",
+  "main": "src/index.ts",
+  "compatibility_date": "2023-11-21",
+  "durable_objects": {
+    "bindings": [
+      { "name": "MY_AGENT", "class_name": "MyAgent" },
+      { "name": "SUPERVISOR", "class_name": "SupervisorAgent" },
+      { "name": "WORKER", "class_name": "WorkerAgent" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["MyAgent", "SupervisorAgent", "WorkerAgent"] }
+  ]
+}

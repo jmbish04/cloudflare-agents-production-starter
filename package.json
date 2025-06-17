@@ -1,0 +1,19 @@
+{
+  "name": "core-agent-model",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20231025.0",
+    "typescript": "^5.2.2",
+    "wrangler": "^3.15.0",
+    "vitest": "^0.34.6"
+  },
+  "dependencies": {
+    "agents": "latest"
+  }
+}
