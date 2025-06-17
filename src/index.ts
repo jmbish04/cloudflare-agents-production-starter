@@ -42,7 +42,6 @@ app.use('/api/secure/*', async (c, next) => {
   return c.text('Unauthorized', 401);
 });
 
-// WebSocket helper function
 async function setupWebSocket<T>(
   env: any,
   agentBinding: any,
@@ -94,30 +93,29 @@ async function setupWebSocket<T>(
     console.error('WebSocket connect error:', error);
   }
   
-  return new Response(null, { status: 101, webSocket: client });
+  return new Response(null, { 
+    status: 101, 
+    webSocket: client,
+    headers: { 'Upgrade': 'websocket' }
+  });
 }
 
-// WebSocket routes
-app.get('/counter-agent/:id', async (c) => {
-  if (c.req.header('upgrade') === 'websocket') {
+function createAgentRoute<T>(agentBindingKey: keyof WorkerEnv, agentClass: new (...args: any[]) => T, supportWebSocket = false) {
+  return async (c: any) => {
     const agentId = c.req.param('id');
-    return setupWebSocket(c.env, c.env.COUNTER_AGENT, agentId, CounterAgent);
-  }
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
+    
+    if (supportWebSocket && c.req.header('upgrade') === 'websocket') {
+      return setupWebSocket(c.env, c.env[agentBindingKey], agentId, agentClass);
+    }
+    
+    const agent = await getAgentByName<WorkerEnv, T>(c.env[agentBindingKey], agentId);
+    return agent.onRequest(c.req.raw);
+  };
+}
 
-app.get('/agent/counter-agent/:id', async (c) => {
-  if (c.req.header('upgrade') === 'websocket') {
-    const agentId = c.req.param('id');
-    return setupWebSocket(c.env, c.env.COUNTER_AGENT, agentId, CounterAgent);
-  }
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
+// WebSocket and HTTP agent routes with unified handlers
+app.get('/counter-agent/:id', createAgentRoute('COUNTER_AGENT', CounterAgent, true));
+app.get('/agent/counter-agent/:id', createAgentRoute('COUNTER_AGENT', CounterAgent, true));
 app.get('/echo-agent/:id', async (c) => {
   if (c.req.header('upgrade') === 'websocket') {
     const agentId = c.req.param('id');
@@ -125,7 +123,6 @@ app.get('/echo-agent/:id', async (c) => {
   }
   return new Response("Not Found", { status: 404 });
 });
-
 app.get('/chatty-agent/:id', async (c) => {
   if (c.req.header('upgrade') === 'websocket') {
     const agentId = c.req.param('id');
@@ -133,16 +130,7 @@ app.get('/chatty-agent/:id', async (c) => {
   }
   return new Response("Not Found", { status: 404 });
 });
-
-app.get('/routing-agent/:id', async (c) => {
-  if (c.req.header('upgrade') === 'websocket') {
-    const agentId = c.req.param('id');
-    return setupWebSocket(c.env, c.env.ROUTING_AGENT, agentId, RoutingAgent);
-  }
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, RoutingAgent>(c.env.ROUTING_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
+app.get('/routing-agent/:id', createAgentRoute('ROUTING_AGENT', RoutingAgent, true));
 
 // Core API routes
 app.get('/agent/my-agent/:id', async (c) => {
@@ -192,68 +180,21 @@ app.get('/api/secure/ws/connect/:id', async (c) => {
   return new Response('WebSocket upgrade required', { status: 400 });
 });
 
-// State management agents
-app.all('/agent/history-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, HistoryAgent>(c.env.HISTORY_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
+// State management agents with unified handlers
+app.all('/agent/history-agent/:id/*', createAgentRoute('HISTORY_AGENT', HistoryAgent));
+app.all('/counter-agent/:id/*', createAgentRoute('COUNTER_AGENT', CounterAgent));
+app.all('/agent/counter-agent/:id/*', createAgentRoute('COUNTER_AGENT', CounterAgent));
+app.all('/agent/migrating-agent/:id/*', createAgentRoute('MIGRATING_AGENT', MigratingAgent));
+app.all('/streaming-agent/:id/*', createAgentRoute('STREAMING_AGENT', StreamingAgent));
 
-app.all('/counter-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
+// Orchestration agents with unified handlers
+app.all('/agent/reminder-agent/:id/*', createAgentRoute('REMINDER_AGENT', ReminderAgent));
+app.all('/agent/schedule-manager-agent/:id/*', createAgentRoute('SCHEDULE_MANAGER_AGENT', ScheduleManagerAgent));
+app.all('/agent/onboarding-agent/:id/*', createAgentRoute('ONBOARDING_AGENT', OnboardingAgent));
 
-app.all('/agent/counter-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
-app.all('/agent/migrating-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, MigratingAgent>(c.env.MIGRATING_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
-app.all('/streaming-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, StreamingAgent>(c.env.STREAMING_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
-// Orchestration agents
-app.all('/agent/reminder-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, ReminderAgent>(c.env.REMINDER_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
-app.all('/agent/schedule-manager-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, ScheduleManagerAgent>(c.env.SCHEDULE_MANAGER_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
-app.all('/agent/onboarding-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, OnboardingAgent>(c.env.ONBOARDING_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
-// AI agents
-app.all('/agent/rag-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, RAGAgent>(c.env.RAG_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
-
-app.all('/agent/routing-agent/:id/*', async (c) => {
-  const agentId = c.req.param('id');
-  const agent = await getAgentByName<WorkerEnv, RoutingAgent>(c.env.ROUTING_AGENT, agentId);
-  return agent.onRequest(c.req.raw);
-});
+// AI agents with unified handlers
+app.all('/agent/rag-agent/:id/*', createAgentRoute('RAG_AGENT', RAGAgent));
+app.all('/agent/routing-agent/:id/*', createAgentRoute('ROUTING_AGENT', RoutingAgent));
 
 // Tool agents
 app.post('/tool/github/:owner/:repo', async (c) => {
@@ -279,12 +220,10 @@ app.post('/tool/browser/title', async (c) => {
     : c.json({ error: "Failed to retrieve page title." }, 500);
 });
 
-// Custom 404 handler to match original behavior
 app.notFound((c) => {
   return new Response("Not Found", { status: 404 });
 });
 
-// Error handler to match original behavior
 app.onError((err, c) => {
   console.error('Worker error:', err);
   return new Response("Internal Server Error", { status: 500 });
