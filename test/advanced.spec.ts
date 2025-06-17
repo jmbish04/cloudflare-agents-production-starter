@@ -82,7 +82,7 @@ describe('Advanced Agentic Patterns', () => {
       expect(response.status).toBe(202);
       const responseBody = await response.json();
       expect(responseBody.message).toBe('Awaiting human approval.');
-      expect(responseBody.interventionUrl).toContain('test-hitl-agent');
+      expect(responseBody.interventionUrl).toContain('token=');
     });
 
     it('should handle intervention commands', async () => {

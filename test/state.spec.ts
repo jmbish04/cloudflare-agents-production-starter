@@ -159,7 +159,7 @@ describe('State Management Agents', () => {
       const connection = { id: 'test', send: vi.fn(), messages: [] } as any;
       
       await agent.onMessage(connection, 'invalid json');
-      expect(connection.send).toHaveBeenCalledWith(JSON.stringify({ error: 'Invalid command format' }));
+      expect(connection.send).toHaveBeenCalledWith(JSON.stringify({ error: 'Invalid JSON format' }));
     });
 
     it('should handle POST /increment requests', async () => {

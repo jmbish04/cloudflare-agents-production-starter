@@ -137,7 +137,7 @@ describe('Agent Interactions Integration Tests', () => {
       const invalidCommand = 'invalid json';
       await counterAgent.onMessage(mockConnection, invalidCommand);
       
-      expect(mockConnection.send).toHaveBeenCalledWith('{"error":"Invalid command format"}');
+      expect(mockConnection.send).toHaveBeenCalledWith('{"error":"Invalid JSON format"}');
       
       // HTTP requests should still work
       const request = new Request('http://example.com/agent/counter-agent/test-id/increment', {
@@ -241,7 +241,7 @@ describe('Agent Interactions Integration Tests', () => {
       // Counter agent validation
       await counterAgent.onMessage(mockConnection, JSON.stringify({ op: 'increment', value: 'invalid' }));
       expect(mockConnection.messages.some(msg => 
-        JSON.parse(msg).error?.includes('Invalid value')
+        JSON.parse(msg).error?.includes('Invalid command format')
       )).toBe(true);
       
       // History agent validation

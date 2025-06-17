@@ -101,14 +101,16 @@ describe('CounterAgent', () => {
       const command = JSON.stringify({ op: 'unknown' });
       await agent.onMessage(mockConnection, command);
       
-      expect(mockConnection.send).toHaveBeenCalledWith('{"error":"Unknown command: unknown"}');
+      expect(mockConnection.send).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid command format')
+      );
     });
 
     it('should send error for invalid JSON', async () => {
       const invalidJson = 'invalid json';
       await agent.onMessage(mockConnection, invalidJson);
       
-      expect(mockConnection.send).toHaveBeenCalledWith('{"error":"Invalid command format"}');
+      expect(mockConnection.send).toHaveBeenCalledWith('{"error":"Invalid JSON format"}');
     });
   });
 

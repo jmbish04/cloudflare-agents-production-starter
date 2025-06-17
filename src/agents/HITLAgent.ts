@@ -1,4 +1,6 @@
 import { Agent, Connection } from "agents";
+import { SignJWT, jwtVerify } from "jose";
+import { z } from "zod";
 
 interface HITLState {
   status: "idle" | "pending_review" | "running" | "aborted" | "completed";
@@ -9,6 +11,11 @@ interface HITLInterventionCommand {
   op: "proceed" | "override" | "abort";
   newData?: any;
 }
+
+const HITLInterventionCommandSchema = z.object({
+  op: z.enum(["proceed", "override", "abort"]),
+  newData: z.any().optional()
+});
 
 export class HITLAgent extends Agent<any, HITLState> {
   initialState: HITLState = { status: "idle", data: null };
@@ -32,8 +39,8 @@ export class HITLAgent extends Agent<any, HITLState> {
     // Pause workflow
     this.setState({ status: "pending_review", data });
 
-    // Generate a unique URL for the intervention UI
-    const interventionUrl = `https://${this.env.DOMAIN || 'localhost'}/intervention?agentId=${this.name}`;
+    // Generate a signed intervention URL with expiry
+    const interventionUrl = await this.generateSecureInterventionUrl();
     console.log(`NEEDS REVIEW: ${interventionUrl}`); // In reality, send to Slack/email
 
     return new Response(
@@ -48,6 +55,44 @@ export class HITLAgent extends Agent<any, HITLState> {
     );
   }
 
+  private async generateSecureInterventionUrl(): Promise<string> {
+    const secret = this.env.INTERVENTION_JWT_SECRET || "fallback-dev-secret";
+    const encoder = new TextEncoder();
+    const secretKey = encoder.encode(secret);
+
+    const token = await new SignJWT({
+      agentId: this.name,
+      purpose: "intervention",
+      iat: Math.floor(Date.now() / 1000)
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setExpirationTime("1h")
+      .setIssuedAt()
+      .sign(secretKey);
+
+    const baseUrl = this.env.DOMAIN ? `https://${this.env.DOMAIN}` : 'http://localhost:8787';
+    return `${baseUrl}/intervention?token=${token}`;
+  }
+
+  async verifyInterventionToken(token: string): Promise<{ agentId: string } | null> {
+    try {
+      const secret = this.env.INTERVENTION_JWT_SECRET || "fallback-dev-secret";
+      const encoder = new TextEncoder();
+      const secretKey = encoder.encode(secret);
+
+      const { payload } = await jwtVerify(token, secretKey);
+      
+      if (payload.purpose === "intervention" && payload.agentId === this.name) {
+        return { agentId: payload.agentId as string };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Token verification failed:", error);
+      return null;
+    }
+  }
+
   async onConnect(connection: Connection): Promise<void> {
     // Send current state to newly connected intervention UI
     connection.send(JSON.stringify({ 
@@ -58,7 +103,19 @@ export class HITLAgent extends Agent<any, HITLState> {
 
   async onMessage(connection: Connection, message: string): Promise<void> {
     try {
-      const command: HITLInterventionCommand = JSON.parse(message);
+      const parsedMessage = JSON.parse(message);
+      const validationResult = HITLInterventionCommandSchema.safeParse(parsedMessage);
+      
+      if (!validationResult.success) {
+        connection.send(JSON.stringify({ 
+          type: "error", 
+          message: "Invalid command format",
+          details: validationResult.error.errors
+        }));
+        return;
+      }
+
+      const command = validationResult.data;
       
       if (this.state.status !== "pending_review") {
         connection.send(JSON.stringify({ 
@@ -84,13 +141,6 @@ export class HITLAgent extends Agent<any, HITLState> {
         case "abort":
           this.setState({ ...this.state, status: "aborted" });
           break;
-        
-        default:
-          connection.send(JSON.stringify({ 
-            type: "error", 
-            message: "Invalid command operation" 
-          }));
-          return;
       }
 
       // Broadcast state update to all connected clients
@@ -101,7 +151,7 @@ export class HITLAgent extends Agent<any, HITLState> {
     } catch (error) {
       connection.send(JSON.stringify({ 
         type: "error", 
-        message: "Invalid command format" 
+        message: "Invalid JSON or command format" 
       }));
     }
   }

@@ -122,20 +122,8 @@ function createAgentRoute<T>(agentBindingKey: keyof WorkerEnv, agentClass: new (
 // WebSocket and HTTP agent routes with unified handlers
 app.get('/counter-agent/:id', createAgentRoute('COUNTER_AGENT', CounterAgent, true));
 app.get('/agent/counter-agent/:id', createAgentRoute('COUNTER_AGENT', CounterAgent, true));
-app.get('/echo-agent/:id', async (c) => {
-  if (c.req.header('upgrade') === 'websocket') {
-    const agentId = c.req.param('id');
-    return setupWebSocket(c.env, c.env.ECHO_AGENT, agentId, EchoAgent);
-  }
-  return new Response("Not Found", { status: 404 });
-});
-app.get('/chatty-agent/:id', async (c) => {
-  if (c.req.header('upgrade') === 'websocket') {
-    const agentId = c.req.param('id');
-    return setupWebSocket(c.env, c.env.CHATTY_AGENT, agentId, ChattyAgent);
-  }
-  return new Response("Not Found", { status: 404 });
-});
+app.get('/echo-agent/:id', createAgentRoute('ECHO_AGENT', EchoAgent, true));
+app.get('/chatty-agent/:id', createAgentRoute('CHATTY_AGENT', ChattyAgent, true));
 app.get('/routing-agent/:id', createAgentRoute('ROUTING_AGENT', RoutingAgent, true));
 
 // HITL Agent routes
@@ -243,7 +231,7 @@ app.onError((err, c) => {
   return new Response("Internal Server Error", { status: 500 });
 });
 
-// OAuth Provider for Secure MCP Server
+// OAuth Provider for Secure MCP Server with scope-based permissions
 const oauthProvider = new OAuthProvider({
   apiHandlers: {
     '/sse': SecureMcpAgent.serveSSE('/sse'),
@@ -252,23 +240,41 @@ const oauthProvider = new OAuthProvider({
   defaultHandler: handleAuthDefault,
   authorizeEndpoint: "/authorize",
   tokenEndpoint: "/token",
+  scopes: {
+    'mcp:read': 'Read-only access to MCP tools',
+    'mcp:write': 'Full access to MCP tools',
+    'tools:echo': 'Access to echo tool',
+    'tools:time': 'Access to time tool',
+    'tools:info': 'Access to server info tool',
+    'admin': 'Administrative access to all tools'
+  }
 });
 
-// Main export - check if this is an OAuth MCP route first
-export default {
-  async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    
-    // Check if this is an OAuth/MCP route
-    const mcpPaths = ['/authorize', '/token', '/sse', '/mcp', '/login', '/info'];
-    if (mcpPaths.some(path => url.pathname.startsWith(path)) || url.pathname === '/') {
-      return oauthProvider.fetch(request, env, ctx);
-    }
-    
-    // Otherwise, use the regular Hono app
-    return app.fetch(request, env, ctx);
-  }
-};
+// OAuth/MCP routes integrated into Hono app
+app.all('/authorize', async (c) => {
+  return oauthProvider.fetch(c.req.raw, c.env, c.executionCtx);
+});
+app.all('/token', async (c) => {
+  return oauthProvider.fetch(c.req.raw, c.env, c.executionCtx);
+});
+app.all('/sse', async (c) => {
+  return oauthProvider.fetch(c.req.raw, c.env, c.executionCtx);
+});
+app.all('/mcp', async (c) => {
+  return oauthProvider.fetch(c.req.raw, c.env, c.executionCtx);
+});
+app.all('/login', async (c) => {
+  return oauthProvider.fetch(c.req.raw, c.env, c.executionCtx);
+});
+app.all('/info', async (c) => {
+  return oauthProvider.fetch(c.req.raw, c.env, c.executionCtx);
+});
+app.get('/', async (c) => {
+  return oauthProvider.fetch(c.req.raw, c.env, c.executionCtx);
+});
+
+// Main export - simplified with proper Hono routing
+export default app;
 
 // Re-export Agent classes for wrangler.jsonc to find them
 export { MyAgent } from './agents/MyAgent';
