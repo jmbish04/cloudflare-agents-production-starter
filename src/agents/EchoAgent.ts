@@ -1,4 +1,7 @@
-import { Agent, Connection, WSMessage } from "agents";
+import { Agent } from "agents";
+import { Connection } from "partyserver";
+
+type WSMessage = string;
 
 export class EchoAgent extends Agent {
   async onConnect(connection: Connection) {

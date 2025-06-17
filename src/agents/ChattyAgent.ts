@@ -1,4 +1,5 @@
-import { Agent, Connection } from "agents";
+import { Agent } from "agents";
+import { Connection } from "partyserver";
 
 interface ConnState { 
   nickname: string; 

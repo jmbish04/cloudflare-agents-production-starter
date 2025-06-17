@@ -39,6 +39,7 @@ export interface WorkerEnv {
   
   // Secrets
   VALID_BEARER_TOKEN: string;
+  JWT_SECRET: string;
   EMAIL_WORKFLOW: any;
   OPENAI_API_KEY: string;
 }

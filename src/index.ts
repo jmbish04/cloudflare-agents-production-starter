@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { jwt } from 'hono/jwt';
 import { getAgentByName } from 'agents';
 import { AuthAgent } from './agents/AuthAgent';
 import { MyAgent } from './agents/MyAgent';
@@ -20,14 +21,21 @@ import type { WorkerEnv } from './types';
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
-// Auth Gateway Middleware
+// Auth Gateway Middleware - JWT-based
+app.use('/api/secure/*', jwt({
+  secret: async (c) => c.env.JWT_SECRET,
+  alg: 'HS256'
+}));
+
+// Fallback for old bearer token auth (backward compatibility)
 app.use('/api/secure/*', async (c, next) => {
   const authHeader = c.req.header('Authorization');
   const expectedToken = `Bearer ${c.env.VALID_BEARER_TOKEN}`;
-  if (authHeader !== expectedToken) {
-    return c.text('Unauthorized', 401);
+  if (authHeader === expectedToken) {
+    await next();
+    return;
   }
-  await next();
+  return c.text('Unauthorized', 401);
 });
 
 // WebSocket helper function
