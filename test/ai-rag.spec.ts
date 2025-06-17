@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
 import type { WorkerEnv } from '../src/types';
+import { startMockServer, stopMockServer } from './mocks/server';
 
 vi.mock('agents', () => {
   const agentStates: Record<string, any> = {};
@@ -54,6 +55,9 @@ vi.mock('agents', () => {
 });
 
 describe('AI and RAG Agents', () => {
+  // Start/stop MSW server for external API mocking
+  beforeAll(() => startMockServer());
+  afterAll(() => stopMockServer());
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -178,20 +182,7 @@ describe('AI and RAG Agents', () => {
     });
 
     it('should demonstrate AI Gateway pattern', async () => {
-      const mockFetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          choices: [{
-            message: {
-              content: 'This is a complex reasoning response'
-            }
-          }]
-        })
-      });
-      
-      global.fetch = mockFetch;
-      
-      // Simulate AI Gateway call
+      // Simulate AI Gateway call using MSW mock
       const gatewayUrl = 'https://gateway.ai.cloudflare.com/v1/test-key/openai';
       const prompt = 'Explain quantum computing';
       
@@ -210,15 +201,7 @@ describe('AI and RAG Agents', () => {
 
       const result = await response.json();
       
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('gateway.ai.cloudflare.com'),
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Authorization': 'Bearer test-key'
-          })
-        })
-      );
+      expect(response.ok).toBe(true);
       expect(result.choices[0].message.content).toContain('complex reasoning');
     });
   });

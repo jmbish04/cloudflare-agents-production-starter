@@ -2,8 +2,14 @@ import { Agent } from "agents";
 import type { WorkerEnv, StructuredLog } from "../types";
 
 export class LoggingAgent extends Agent<WorkerEnv> {
+  private currentTraceId?: string;
+
+  setTraceId(traceId: string) {
+    this.currentTraceId = traceId;
+  }
+
   private log(level: 'info' | 'warn' | 'error' | 'debug', eventType: string, message: string, data: object = {}) {
-    const traceId = crypto.randomUUID();
+    const traceId = this.currentTraceId || crypto.randomUUID();
     const logEntry: StructuredLog = {
       timestamp: new Date().toISOString(),
       level,

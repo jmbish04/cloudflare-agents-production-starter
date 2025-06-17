@@ -32,6 +32,14 @@ import type { WorkerEnv, BrowserRequestPayload } from './types';
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
+// Trace ID middleware for request correlation
+app.use('*', async (c, next) => {
+  const traceId = c.req.header('x-trace-id') || crypto.randomUUID();
+  c.set('traceId', traceId);
+  c.header('x-trace-id', traceId);
+  await next();
+});
+
 // Auth Gateway Middleware - JWT-based
 app.use('/api/secure/*', jwt({
   secret: async (c) => c.env.JWT_SECRET,
@@ -53,9 +61,15 @@ async function setupWebSocket<T>(
   env: any,
   agentBinding: any,
   agentId: string,
-  agentClass: new (...args: any[]) => T
+  agentClass: new (...args: any[]) => T,
+  traceId?: string
 ): Promise<Response> {
   const agent = await getAgentByName(agentBinding, agentId);
+  
+  // Pass traceId to agent if it supports it
+  if (traceId && typeof (agent as any).setTraceId === 'function') {
+    (agent as any).setTraceId(traceId);
+  }
   
   const webSocketPair = new WebSocketPair();
   const [client, server] = Object.values(webSocketPair);
@@ -110,12 +124,19 @@ async function setupWebSocket<T>(
 function createAgentRoute<T>(agentBindingKey: keyof WorkerEnv, agentClass: new (...args: any[]) => T, supportWebSocket = false) {
   return async (c: any) => {
     const agentId = c.req.param('id');
+    const traceId = c.get('traceId');
     
     if (supportWebSocket && c.req.header('upgrade') === 'websocket') {
-      return setupWebSocket(c.env, c.env[agentBindingKey], agentId, agentClass);
+      return setupWebSocket(c.env, c.env[agentBindingKey], agentId, agentClass, traceId);
     }
     
     const agent = await getAgentByName<WorkerEnv, T>(c.env[agentBindingKey], agentId);
+    
+    // Pass traceId to agent if it supports it
+    if (typeof (agent as any).setTraceId === 'function') {
+      (agent as any).setTraceId(traceId);
+    }
+    
     return agent.onRequest(c.req.raw);
   };
 }
@@ -178,7 +199,8 @@ app.get('/api/secure/data', (c) => {
 app.get('/api/secure/ws/connect/:id', async (c) => {
   if (c.req.header('upgrade') === 'websocket') {
     const agentId = c.req.param('id');
-    return setupWebSocket(c.env, c.env.AUTH_AGENT, agentId, AuthAgent);
+    const traceId = c.get('traceId');
+    return setupWebSocket(c.env, c.env.AUTH_AGENT, agentId, AuthAgent, traceId);
   }
   return new Response('WebSocket upgrade required', { status: 400 });
 });
