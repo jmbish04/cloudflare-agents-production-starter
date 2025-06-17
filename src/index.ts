@@ -4,6 +4,9 @@ import { SupervisorAgent } from './agents/SupervisorAgent';
 import { HistoryAgent } from './agents/HistoryAgent';
 import { CounterAgent } from './agents/CounterAgent';
 import { MigratingAgent } from './agents/MigratingAgent';
+import { EchoAgent } from './agents/EchoAgent';
+import { StreamingAgent } from './agents/StreamingAgent';
+import { ChattyAgent } from './agents/ChattyAgent';
 // Export the Env type for use in Agent classes
 export type { WorkerEnv } from './types';
 import type { WorkerEnv } from './types';
@@ -15,9 +18,9 @@ export default {
       const path = url.pathname;
 
       // Handle WebSocket upgrades for counter agent
-      if (path.startsWith('/agent/counter-agent/') && request.headers.get('upgrade') === 'websocket') {
+      if (path.startsWith('/counter-agent/') && request.headers.get('upgrade') === 'websocket') {
         const pathParts = path.split('/');
-        const agentId = pathParts[3];
+        const agentId = pathParts[2];
         const agent = await getAgentByName<WorkerEnv, CounterAgent>(env.COUNTER_AGENT, agentId);
         
         const webSocketPair = new WebSocketPair();
@@ -92,9 +95,9 @@ export default {
         return agent.onRequest(request);
       }
 
-      if (path.startsWith('/agent/counter-agent/')) {
+      if (path.startsWith('/counter-agent/')) {
         const pathParts = path.split('/');
-        const agentId = pathParts[3]; // /agent/counter-agent/{id}/... 
+        const agentId = pathParts[2]; // /counter-agent/{id}/... 
         const agent = await getAgentByName<WorkerEnv, CounterAgent>(env.COUNTER_AGENT, agentId);
         return agent.onRequest(request);
       }
@@ -102,6 +105,93 @@ export default {
       if (path.startsWith('/agent/migrating-agent/')) {
         const agentId = path.split('/').pop()!;
         const agent = await getAgentByName<WorkerEnv, MigratingAgent>(env.MIGRATING_AGENT, agentId);
+        return agent.onRequest(request);
+      }
+
+      // Handle WebSocket upgrades for echo agent
+      if (path.startsWith('/echo-agent/') && request.headers.get('upgrade') === 'websocket') {
+        const pathParts = path.split('/');
+        const agentId = pathParts[2];
+        const agent = await getAgentByName<WorkerEnv, EchoAgent>(env.ECHO_AGENT, agentId);
+        
+        const webSocketPair = new WebSocketPair();
+        const [client, server] = Object.values(webSocketPair);
+        
+        server.accept();
+        
+        const connection = {
+          id: `conn-${Date.now()}`,
+          send: (message: string) => server.send(message),
+          close: () => server.close()
+        };
+        
+        server.addEventListener('message', async (event) => {
+          try {
+            await agent.onMessage(connection as any, event.data as string);
+          } catch (error) {
+            console.error('WebSocket message error:', error);
+          }
+        });
+        
+        server.addEventListener('close', async (event) => {
+          try {
+            await agent.onClose?.(connection as any, event.code || 1000, event.reason || '', event.wasClean || true);
+          } catch (error) {
+            console.error('WebSocket close error:', error);
+          }
+        });
+        
+        server.addEventListener('error', async (event) => {
+          try {
+            await agent.onError?.(connection as any, new Error('WebSocket error'));
+          } catch (error) {
+            console.error('WebSocket error handler error:', error);
+          }
+        });
+        
+        try {
+          await agent.onConnect?.(connection as any);
+        } catch (error) {
+          console.error('WebSocket connect error:', error);
+        }
+        
+        return new Response(null, { status: 101, webSocket: client });
+      }
+
+      // Handle WebSocket upgrades for chatty agent
+      if (path.startsWith('/chatty-agent/') && request.headers.get('upgrade') === 'websocket') {
+        const pathParts = path.split('/');
+        const agentId = pathParts[2];
+        const agent = await getAgentByName<WorkerEnv, ChattyAgent>(env.CHATTY_AGENT, agentId);
+        
+        const webSocketPair = new WebSocketPair();
+        const [client, server] = Object.values(webSocketPair);
+        
+        server.accept();
+        
+        const connection = {
+          id: `conn-${Date.now()}`,
+          send: (message: string) => server.send(message),
+          close: () => server.close(),
+          setState: (state: any) => { (connection as any).state = state; },
+          state: null
+        };
+        
+        server.addEventListener('message', async (event) => {
+          try {
+            await agent.onMessage(connection as any, event.data as string);
+          } catch (error) {
+            console.error('WebSocket message error:', error);
+          }
+        });
+        
+        return new Response(null, { status: 101, webSocket: client });
+      }
+
+      // Handle streaming agent
+      if (path.startsWith('/streaming-agent/')) {
+        const agentId = path.split('/').pop()!;
+        const agent = await getAgentByName<WorkerEnv, StreamingAgent>(env.STREAMING_AGENT, agentId);
         return agent.onRequest(request);
       }
 
@@ -120,3 +210,6 @@ export { WorkerAgent } from './agents/WorkerAgent';
 export { HistoryAgent } from './agents/HistoryAgent';
 export { CounterAgent } from './agents/CounterAgent';
 export { MigratingAgent } from './agents/MigratingAgent';
+export { EchoAgent } from './agents/EchoAgent';
+export { StreamingAgent } from './agents/StreamingAgent';
+export { ChattyAgent } from './agents/ChattyAgent';

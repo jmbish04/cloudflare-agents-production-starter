@@ -9,11 +9,15 @@
       { "name": "WORKER", "class_name": "WorkerAgent" },
       { "name": "HISTORY_AGENT", "class_name": "HistoryAgent" },
       { "name": "COUNTER_AGENT", "class_name": "CounterAgent" },
-      { "name": "MIGRATING_AGENT", "class_name": "MigratingAgent" }
+      { "name": "MIGRATING_AGENT", "class_name": "MigratingAgent" },
+      { "name": "ECHO_AGENT", "class_name": "EchoAgent" },
+      { "name": "STREAMING_AGENT", "class_name": "StreamingAgent" },
+      { "name": "CHATTY_AGENT", "class_name": "ChattyAgent" }
     ]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["MyAgent", "SupervisorAgent", "WorkerAgent"] },
-    { "tag": "v2", "new_sqlite_classes": ["HistoryAgent", "CounterAgent", "MigratingAgent"] }
+    { "tag": "v2", "new_sqlite_classes": ["HistoryAgent", "CounterAgent", "MigratingAgent"] },
+    { "tag": "v3", "new_sqlite_classes": ["EchoAgent", "StreamingAgent", "ChattyAgent"] }
   ]
 }
