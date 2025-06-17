@@ -1,0 +1,28 @@
+# Cloudflare Agents: Recommended .gitignore
+
+# Node.js dependencies
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Local development environment files
+# Contains local-only secrets and environment variables. DO NOT COMMIT.
+.dev.vars
+# Wrangler CLI local state and caches.
+.wrangler/
+
+# IDE and OS specific files
+.DS_Store
+.vscode/ 
+# Optional: if not sharing specific IDE settings
+
+.ai/
+.claude/
+.cursor/
