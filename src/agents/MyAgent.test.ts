@@ -7,8 +7,19 @@ vi.mock('agents', () => {
   class TestAgent {
     public name: string = 'test-agent';
     public env: any = {};
+    public state: any = {};
+    
     constructor(name?: string) {
       if (name) this.name = name;
+    }
+    
+    sql(strings: TemplateStringsArray, ...values: any[]) {
+      // Mock SQL execution - just return empty array
+      return [];
+    }
+    
+    setState(newState: any) {
+      this.state = { ...this.state, ...newState };
     }
   }
   return { Agent: TestAgent };
@@ -61,13 +72,33 @@ describe('MyAgent', () => {
   });
 
   describe('onStart', () => {
-    it('should log startup message', async () => {
+    it('should log startup message and initialize SQL/state', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const fetchSpy = vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
       
       await agent.onStart();
       
       expect(consoleSpy).toHaveBeenCalledWith('Agent test-agent starting up for the first time.');
+      expect((agent as any).state.config).toBeDefined();
+      expect((agent as any).state.config.initialized).toBe(true);
+      
       consoleSpy.mockRestore();
+      fetchSpy.mockRestore();
+    });
+
+    it('should handle successful config fetch', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const mockConfig = { setting1: 'value1', setting2: 'value2' };
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+        json: () => Promise.resolve(mockConfig)
+      } as Response);
+      
+      await agent.onStart();
+      
+      expect((agent as any).state.config).toEqual(mockConfig);
+      
+      consoleSpy.mockRestore();
+      fetchSpy.mockRestore();
     });
   });
 });

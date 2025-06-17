@@ -1,7 +1,7 @@
 import { Agent } from "agents";
 import type { WorkerEnv } from "../types";
 
-export class MyAgent extends Agent<WorkerEnv> {
+export class MyAgent extends Agent<WorkerEnv, { config: object }> {
   /**
    * Handles direct HTTP requests to this Agent.
    * Implements spec: CORE-001
@@ -25,6 +25,17 @@ export class MyAgent extends Agent<WorkerEnv> {
    */
   async onStart(): Promise<void> {
     console.log(`Agent ${(this as any).name} starting up for the first time.`);
-    // This is where one-time initialization, like DB schema creation, would go.
+    
+    // SQL schema migration
+    (this as any).sql`CREATE TABLE IF NOT EXISTS config (key TEXT, value TEXT)`;
+    
+    // Example: fetch config from an external source on first start
+    try {
+      const config = await fetch("https://api.example.com/config").then(r => r.json());
+      this.setState({ config });
+    } catch (error) {
+      // Fallback to default config
+      this.setState({ config: { initialized: true, timestamp: Date.now() } });
+    }
   }
 }
