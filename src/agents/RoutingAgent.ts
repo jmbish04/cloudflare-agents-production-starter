@@ -1,5 +1,6 @@
 import { Agent, Connection } from 'agents';
 import type { WorkerEnv } from '../types';
+import { StructuredLogger } from '../utils/StructuredLogger';
 
 interface RoutingState {
   connectionCount: number;
@@ -14,9 +15,12 @@ interface IntentClassification {
 }
 
 export class RoutingAgent extends Agent<WorkerEnv, RoutingState> {
+  private logger: StructuredLogger;
+
   constructor(state: DurableObjectState, env: WorkerEnv) {
     super(state, env);
     this.setState({ connectionCount: 0 });
+    this.logger = new StructuredLogger('RoutingAgent', this.name);
   }
 
   async onConnect(connection: Connection) {
@@ -58,43 +62,65 @@ export class RoutingAgent extends Agent<WorkerEnv, RoutingState> {
 
   private async classifyIntent(prompt: string): Promise<IntentClassification> {
     try {
-      const classificationPrompt = `
-Classify the following user prompt into one of these intents:
-- "get_weather": if the user is asking about weather, temperature, or climate
-- "complex_reasoning": if the user is asking for analysis, explanations, or complex tasks
-- "unknown": if unclear or doesn't fit the above
+      const startTime = Date.now();
+      const response = await this.env.AI.run('@cf/huggingface/distilbert-sst-2-int8', {
+        text: prompt
+      });
+      const latency = Date.now() - startTime;
 
-If the intent is "get_weather", extract the location if mentioned.
-
-User prompt: "${prompt}"
-
-Respond with JSON in this format:
-{
-  "intent": "get_weather" | "complex_reasoning" | "unknown",
-  "entities": {
-    "location": "extracted location or null",
-    "original_prompt": "${prompt}"
-  }
-}`;
-
-      const response = await this.env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
-        prompt: classificationPrompt,
-        max_tokens: 100
+      this.logger.logAiServiceCall({
+        service: 'workers-ai',
+        model: '@cf/huggingface/distilbert-sst-2-int8',
+        operation: 'classification',
+        latencyMs: latency,
+        tokenCount: prompt.split(' ').length,
+        estimatedCost: StructuredLogger.estimateWorkerAiCost('@cf/huggingface/distilbert-sst-2-int8', prompt.split(' ').length),
+        success: true
       });
 
-      try {
-        const parsed = JSON.parse(response.response);
+      const sentiment = response.label?.toLowerCase();
+      const confidence = response.score || 0;
+
+      if (confidence < 0.6) {
+        this.logger.info('routing.classification.low_confidence', 'Low confidence classification, using fallback', { 
+          confidence, 
+          sentiment 
+        });
+        return this.fallbackClassification(prompt);
+      }
+
+      const lowerPrompt = prompt.toLowerCase();
+      
+      if (lowerPrompt.includes('weather') || lowerPrompt.includes('temperature') || lowerPrompt.includes('climate')) {
+        const locationMatch = prompt.match(/(?:in|for|at)\s+([a-zA-Z\s]+)/i);
         return {
-          intent: parsed.intent || 'unknown',
+          intent: 'get_weather',
           entities: {
-            location: parsed.entities?.location || null,
+            location: locationMatch?.[1]?.trim() || null,
             original_prompt: prompt
           }
         };
-      } catch (parseError) {
-        return this.fallbackClassification(prompt);
       }
+
+      if (sentiment === 'positive' && (lowerPrompt.includes('explain') || lowerPrompt.includes('analyze') || lowerPrompt.includes('why') || lowerPrompt.includes('how') || prompt.length > 50)) {
+        return {
+          intent: 'complex_reasoning',
+          entities: {
+            original_prompt: prompt
+          }
+        };
+      }
+
+      return this.fallbackClassification(prompt);
     } catch (error) {
+      this.logger.logAiServiceCall({
+        service: 'workers-ai',
+        model: '@cf/huggingface/distilbert-sst-2-int8',
+        operation: 'classification',
+        latencyMs: 0,
+        success: false,
+        errorCode: error instanceof Error ? error.message : 'Unknown error'
+      });
       return this.fallbackClassification(prompt);
     }
   }
@@ -145,6 +171,7 @@ Respond with JSON in this format:
     try {
       const aiGatewayUrl = `https://gateway.ai.cloudflare.com/v1/${this.env.OPENAI_API_KEY}/openai`;
       
+      const startTime = Date.now();
       const response = await fetch(`${aiGatewayUrl}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -166,14 +193,45 @@ Respond with JSON in this format:
           max_tokens: 500
         })
       });
+      const latency = Date.now() - startTime;
 
       if (!response.ok) {
+        this.logger.logAiServiceCall({
+          service: 'ai-gateway',
+          model: 'gpt-3.5-turbo',
+          operation: 'chat-completion',
+          latencyMs: latency,
+          success: false,
+          errorCode: `HTTP ${response.status}`
+        });
         throw new Error(`AI Gateway request failed: ${response.status}`);
       }
 
       const result = await response.json();
-      return result.choices?.[0]?.message?.content || 'I apologize, but I couldn\'t process that request at the moment.';
+      const responseContent = result.choices?.[0]?.message?.content || 'I apologize, but I couldn\'t process that request at the moment.';
+      const tokenCount = prompt.split(' ').length + responseContent.split(' ').length;
+
+      this.logger.logAiServiceCall({
+        service: 'ai-gateway',
+        model: 'gpt-3.5-turbo',
+        operation: 'chat-completion',
+        latencyMs: latency,
+        tokenCount,
+        estimatedCost: StructuredLogger.estimateAiGatewayCost('gpt-3.5-turbo', tokenCount),
+        success: true
+      });
+
+      this.logger.info('routing.reasoning.completed', 'Complex reasoning request completed', {
+        promptLength: prompt.length,
+        responseLength: responseContent.length,
+        tokenCount
+      });
+
+      return responseContent;
     } catch (error) {
+      this.logger.error('routing.reasoning.failed', 'Reasoning model request failed', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       console.error('Reasoning model error:', error);
       return 'I encountered an error while processing your complex request. Please try again later.';
     }
