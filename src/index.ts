@@ -18,8 +18,10 @@ import { UserAgentV2 } from './agents/UserAgentV2';
 import { PaymentAgentV1 } from './agents/PaymentAgentV1';
 import { RAGAgent } from './agents/RAGAgent';
 import { RoutingAgent } from './agents/RoutingAgent';
+import { GitHubAgent } from './agents/GitHubAgent';
+import { WebBrowserAgent } from './agents/WebBrowserAgent';
 export type { WorkerEnv } from './types';
-import type { WorkerEnv } from './types';
+import type { WorkerEnv, BrowserRequestPayload } from './types';
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
 
@@ -253,6 +255,30 @@ app.all('/agent/routing-agent/:id/*', async (c) => {
   return agent.onRequest(c.req.raw);
 });
 
+// Tool agents
+app.post('/tool/github/:owner/:repo', async (c) => {
+  const owner = c.req.param('owner');
+  const repo = c.req.param('repo');
+  if (!owner || !repo) return c.text('Invalid repo format', 400);
+  
+  const agent = await getAgentByName<WorkerEnv, GitHubAgent>(c.env.GITHUB_AGENT, 'singleton-gh-tool');
+  const repoDetails = await agent.getRepo(`${owner}/${repo}`);
+  
+  return repoDetails
+    ? c.json(repoDetails)
+    : c.json({ error: "Repository not found or API call failed." }, 404);
+});
+
+app.post('/tool/browser/title', async (c) => {
+  const { url } = await c.req.json<BrowserRequestPayload>();
+  const agent = await getAgentByName<WorkerEnv, WebBrowserAgent>(c.env.BROWSER_AGENT, `browser-tool-for-${url}`);
+  const title = await agent.getPageTitle(url);
+
+  return title
+    ? c.json({ title })
+    : c.json({ error: "Failed to retrieve page title." }, 500);
+});
+
 // Custom 404 handler to match original behavior
 app.notFound((c) => {
   return new Response("Not Found", { status: 404 });
@@ -285,4 +311,6 @@ export { UserAgentV2 } from './agents/UserAgentV2';
 export { PaymentAgentV1 } from './agents/PaymentAgentV1';
 export { RAGAgent } from './agents/RAGAgent';
 export { RoutingAgent } from './agents/RoutingAgent';
+export { GitHubAgent } from './agents/GitHubAgent';
+export { WebBrowserAgent } from './agents/WebBrowserAgent';
 export { EmailWorkflow } from './workflows/EmailWorkflow';

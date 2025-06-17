@@ -17,6 +17,8 @@ import type { UserAgentV2 } from './agents/UserAgentV2';
 import type { WorkerAgent } from './agents/WorkerAgent';
 import type { RAGAgent } from './agents/RAGAgent';
 import type { RoutingAgent } from './agents/RoutingAgent';
+import type { GitHubAgent } from './agents/GitHubAgent';
+import type { WebBrowserAgent } from './agents/WebBrowserAgent';
 
 export interface WorkerEnv {
   // Existing agents
@@ -43,13 +45,32 @@ export interface WorkerEnv {
   RAG_AGENT: AgentNamespace<RAGAgent>;
   ROUTING_AGENT: AgentNamespace<RoutingAgent>;
   
+  // Tool agents
+  GITHUB_AGENT: AgentNamespace<GitHubAgent>;
+  BROWSER_AGENT: AgentNamespace<WebBrowserAgent>;
+  
   // AI services
   AI: Ai;
   VECTOR_DB: VectorizeIndex;
+  BROWSER: Fetcher;
   
   // Secrets
   VALID_BEARER_TOKEN: string;
   JWT_SECRET: string;
   EMAIL_WORKFLOW: any;
   OPENAI_API_KEY: string;
+  GITHUB_API_TOKEN: string;
+}
+
+export interface GitHubRepoDTO {
+  name: string;
+  full_name: string;
+  description: string | null;
+  stargazers_count: number;
+  open_issues_count: number;
+  url: string;
+}
+
+export interface BrowserRequestPayload {
+  url: string;
 }

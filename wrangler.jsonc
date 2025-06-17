@@ -76,6 +76,14 @@
       {
         "name": "ROUTING_AGENT",
         "class_name": "RoutingAgent"
+      },
+      {
+        "name": "GITHUB_AGENT",
+        "class_name": "GitHubAgent"
+      },
+      {
+        "name": "BROWSER_AGENT",
+        "class_name": "WebBrowserAgent"
       }
     ]
   },
@@ -88,6 +96,9 @@
       "index_name": "vector-index"
     }
   ],
+  "browser": {
+    "binding": "BROWSER"
+  },
   "workflows": [
     {
       "name": "EMAIL_WORKFLOW",
@@ -140,6 +151,13 @@
       "tag": "v6",
       "new_sqlite_classes": [
         "RAGAgent"
+      ]
+    },
+    {
+      "tag": "v7",
+      "new_sqlite_classes": [
+        "GitHubAgent",
+        "WebBrowserAgent"
       ]
     }
   ]
