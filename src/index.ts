@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getAgentByName } from 'agents';
+import { AuthAgent } from './agents/AuthAgent';
 import { MyAgent } from './agents/MyAgent';
 import { SupervisorAgent } from './agents/SupervisorAgent';
 import { HistoryAgent } from './agents/HistoryAgent';
@@ -11,10 +12,23 @@ import { ChattyAgent } from './agents/ChattyAgent';
 import { ReminderAgent } from './agents/ReminderAgent';
 import { ScheduleManagerAgent } from './agents/ScheduleManagerAgent';
 import { OnboardingAgent } from './agents/OnboardingAgent';
+import { UserAgentV1 } from './agents/UserAgentV1';
+import { UserAgentV2 } from './agents/UserAgentV2';
+import { PaymentAgentV1 } from './agents/PaymentAgentV1';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv } from './types';
 
 const app = new Hono<{ Bindings: WorkerEnv }>();
+
+// Auth Gateway Middleware
+app.use('/api/secure/*', async (c, next) => {
+  const authHeader = c.req.header('Authorization');
+  const expectedToken = `Bearer ${c.env.VALID_BEARER_TOKEN}`;
+  if (authHeader !== expectedToken) {
+    return c.text('Unauthorized', 401);
+  }
+  await next();
+});
 
 // WebSocket helper function
 async function setupWebSocket<T>(
@@ -131,6 +145,31 @@ app.post('/dispatch-task', async (c) => {
   }
 });
 
+// Versioned API routes
+app.get('/v1/user/:id', async (c) => {
+  const agent = await getAgentByName<WorkerEnv, UserAgentV1>(c.env.USER_AGENT_V1, c.req.param('id'));
+  return c.json(await agent.getProfile());
+});
+
+app.post('/v2/user/:id/upgrade', async (c) => {
+  const agent = await getAgentByName<WorkerEnv, UserAgentV2>(c.env.USER_AGENT_V2, c.req.param('id'));
+  return c.json(await agent.upgradeSubscription());
+});
+
+// Protected routes with authentication
+app.get('/api/secure/data', (c) => {
+  return c.json({ secret: 'The vault is open.' });
+});
+
+// Secure WebSocket connection
+app.get('/api/secure/ws/connect/:id', async (c) => {
+  if (c.req.header('upgrade') === 'websocket') {
+    const agentId = c.req.param('id');
+    return setupWebSocket(c.env, c.env.AUTH_AGENT, agentId, AuthAgent);
+  }
+  return new Response('WebSocket upgrade required', { status: 400 });
+});
+
 // State management agents
 app.all('/agent/history-agent/:id/*', async (c) => {
   const agentId = c.req.param('id');
@@ -207,4 +246,8 @@ export { ChattyAgent } from './agents/ChattyAgent';
 export { ReminderAgent } from './agents/ReminderAgent';
 export { ScheduleManagerAgent } from './agents/ScheduleManagerAgent';
 export { OnboardingAgent } from './agents/OnboardingAgent';
+export { AuthAgent } from './agents/AuthAgent';
+export { UserAgentV1 } from './agents/UserAgentV1';
+export { UserAgentV2 } from './agents/UserAgentV2';
+export { PaymentAgentV1 } from './agents/PaymentAgentV1';
 export { EmailWorkflow } from './workflows/EmailWorkflow';

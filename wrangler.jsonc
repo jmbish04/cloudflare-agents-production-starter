@@ -51,6 +51,22 @@
       {
         "name": "ONBOARDING_AGENT", 
         "class_name": "OnboardingAgent"
+      },
+      {
+        "name": "AUTH_AGENT",
+        "class_name": "AuthAgent"
+      },
+      {
+        "name": "USER_AGENT_V1",
+        "class_name": "UserAgentV1"
+      },
+      {
+        "name": "USER_AGENT_V2",
+        "class_name": "UserAgentV2"
+      },
+      {
+        "name": "PAYMENT_AGENT_V1",
+        "class_name": "PaymentAgentV1"
       }
     ]
   },
@@ -91,6 +107,15 @@
         "ReminderAgent",
         "ScheduleManagerAgent",
         "OnboardingAgent"
+      ]
+    },
+    {
+      "tag": "v5",
+      "new_sqlite_classes": [
+        "AuthAgent",
+        "UserAgentV1",
+        "UserAgentV2",
+        "PaymentAgentV1"
       ]
     }
   ]
