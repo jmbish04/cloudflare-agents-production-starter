@@ -100,6 +100,10 @@
       {
         "name": "SECURE_MCP_AGENT",
         "class_name": "SecureMcpAgent"
+      },
+      {
+        "name": "LOGGING_AGENT",
+        "class_name": "LoggingAgent"
       }
     ]
   },
@@ -182,7 +186,8 @@
         "HITLAgent",
         "StatefulCalculatorAgent",
         "PersistentCounterAgent",
-        "SecureMcpAgent"
+        "SecureMcpAgent",
+        "LoggingAgent"
       ]
     }
   ]

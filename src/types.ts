@@ -19,6 +19,22 @@ import type { RAGAgent } from './agents/RAGAgent';
 import type { RoutingAgent } from './agents/RoutingAgent';
 import type { GitHubAgent } from './agents/GitHubAgent';
 import type { WebBrowserAgent } from './agents/WebBrowserAgent';
+import type { LoggingAgent } from './agents/LoggingAgent';
+
+export interface CounterState {
+  counter: number;
+}
+
+export interface StructuredLog {
+  timestamp: string;
+  agentClass: string;
+  agentId: string;
+  traceId: string;
+  eventType: string;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  data: object;
+}
 
 export interface WorkerEnv {
   // Existing agents
@@ -48,6 +64,7 @@ export interface WorkerEnv {
   // Tool agents
   GITHUB_AGENT: AgentNamespace<GitHubAgent>;
   BROWSER_AGENT: AgentNamespace<WebBrowserAgent>;
+  LOGGING_AGENT: AgentNamespace<LoggingAgent>;
   
   // AI services
   AI: Ai;

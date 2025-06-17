@@ -1,11 +1,7 @@
 import { Agent } from "agents";
 import { Connection } from "partyserver";
 import { z } from "zod";
-import type { WorkerEnv } from "../types";
-
-interface CounterState {
-  counter: number;
-}
+import type { WorkerEnv, CounterState } from "../types";
 
 interface StateUpdateCommand {
   op: 'increment' | 'decrement';
@@ -68,8 +64,10 @@ export class CounterAgent extends Agent<WorkerEnv, CounterState> {
     }
   }
 
-  async increment(): Promise<void> {
-    this.setState({ counter: this.state.counter + 1 });
+  async increment(): Promise<CounterState> {
+    const newState = { counter: this.state.counter + 1 };
+    this.setState(newState);
+    return newState;
   }
 
   onStateUpdate(newState: CounterState, source: "server" | Connection): void {

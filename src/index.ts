@@ -25,6 +25,7 @@ import { HITLAgent } from './agents/HITLAgent';
 import { StatefulCalculatorAgent } from './agents/StatefulCalculatorAgent';
 import { PersistentCounterAgent } from './agents/PersistentCounterAgent';
 import { SecureMcpAgent } from './agents/SecureMcpAgent';
+import { LoggingAgent } from './agents/LoggingAgent';
 import { handleAuthDefault } from './auth-handler';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv, BrowserRequestPayload } from './types';
@@ -198,6 +199,12 @@ app.all('/agent/onboarding-agent/:id/*', createAgentRoute('ONBOARDING_AGENT', On
 app.all('/agent/rag-agent/:id/*', createAgentRoute('RAG_AGENT', RAGAgent));
 app.all('/agent/routing-agent/:id/*', createAgentRoute('ROUTING_AGENT', RoutingAgent));
 
+// Route for counter test
+app.post('/agent/counter/:id', createAgentRoute('COUNTER_AGENT', CounterAgent));
+
+// Route for logging test
+app.get('/agent/logging/:id', createAgentRoute('LOGGING_AGENT', LoggingAgent));
+
 // Tool agents
 app.post('/tool/github/:owner/:repo', async (c) => {
   const owner = c.req.param('owner');
@@ -302,3 +309,4 @@ export { HITLAgent } from './agents/HITLAgent';
 export { StatefulCalculatorAgent } from './agents/StatefulCalculatorAgent';
 export { PersistentCounterAgent } from './agents/PersistentCounterAgent';
 export { SecureMcpAgent } from './agents/SecureMcpAgent';
+export { LoggingAgent } from './agents/LoggingAgent';
