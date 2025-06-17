@@ -26,7 +26,7 @@ export class ScheduleManagerAgent extends Agent<WorkerEnv, ScheduleManagerState>
   async scheduleFollowUp(): Promise<Response> {
     if (this.state.followUpTaskId) {
       return new Response(JSON.stringify({
-        error: 'A follow-up is already scheduled.',
+        status: 'A follow-up is already scheduled.',
         currentTaskId: this.state.followUpTaskId
       }), {
         status: 409,
@@ -58,7 +58,7 @@ export class ScheduleManagerAgent extends Agent<WorkerEnv, ScheduleManagerState>
   async cancelFollowUp(): Promise<Response> {
     if (!this.state.followUpTaskId) {
       return new Response(JSON.stringify({
-        error: 'No task to cancel.'
+        status: 'No task to cancel.'
       }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }

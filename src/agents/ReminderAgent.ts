@@ -33,7 +33,7 @@ export class ReminderAgent extends Agent<WorkerEnv> {
         });
 
         return new Response(JSON.stringify({
-          status: 'Reminder set!',
+          status: 'Resilient reminder set!',
           taskId
         }), {
           headers: { 'Content-Type': 'application/json' }

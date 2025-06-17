@@ -1,3 +1,4 @@
+import { Hono } from 'hono';
 import { getAgentByName } from 'agents';
 import { MyAgent } from './agents/MyAgent';
 import { SupervisorAgent } from './agents/SupervisorAgent';
@@ -10,225 +11,188 @@ import { ChattyAgent } from './agents/ChattyAgent';
 import { ReminderAgent } from './agents/ReminderAgent';
 import { ScheduleManagerAgent } from './agents/ScheduleManagerAgent';
 import { OnboardingAgent } from './agents/OnboardingAgent';
-// Export the Env type for use in Agent classes
 export type { WorkerEnv } from './types';
 import type { WorkerEnv } from './types';
 
-export default {
-  async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
+const app = new Hono<{ Bindings: WorkerEnv }>();
+
+// WebSocket helper function
+async function setupWebSocket<T>(
+  env: any,
+  agentBinding: any,
+  agentId: string,
+  agentClass: new (...args: any[]) => T
+): Promise<Response> {
+  const agent = await getAgentByName(agentBinding, agentId);
+  
+  const webSocketPair = new WebSocketPair();
+  const [client, server] = Object.values(webSocketPair);
+  
+  server.accept();
+  
+  const connection = {
+    id: `conn-${Date.now()}`,
+    send: (message: string) => server.send(message),
+    close: () => server.close(),
+    setState: (state: any) => { (connection as any).state = state; },
+    state: null
+  };
+  
+  server.addEventListener('message', async (event) => {
     try {
-      const url = new URL(request.url);
-      const path = url.pathname;
-
-      // Handle WebSocket upgrades for counter agent
-      if ((path.startsWith('/counter-agent/') || path.startsWith('/agent/counter-agent/')) && request.headers.get('upgrade') === 'websocket') {
-        const pathParts = path.split('/');
-        const agentId = path.startsWith('/agent/') ? pathParts[3] : pathParts[2];
-        const agent = await getAgentByName<WorkerEnv, CounterAgent>(env.COUNTER_AGENT, agentId);
-        
-        const webSocketPair = new WebSocketPair();
-        const [client, server] = Object.values(webSocketPair);
-        
-        server.accept();
-        
-        // Create a mock connection that implements the required interface
-        const connection = {
-          id: `conn-${Date.now()}`,
-          send: (message: string) => server.send(message),
-          close: () => server.close()
-        };
-        
-        // Handle WebSocket events
-        server.addEventListener('message', async (event) => {
-          try {
-            await agent.onMessage(connection as any, event.data as string);
-          } catch (error) {
-            console.error('WebSocket message error:', error);
-          }
-        });
-        
-        server.addEventListener('close', async (event) => {
-          try {
-            await agent.onClose?.(connection as any, event.code || 1000, event.reason || '', event.wasClean || true);
-          } catch (error) {
-            console.error('WebSocket close error:', error);
-          }
-        });
-        
-        // Trigger onConnect
-        try {
-          await agent.onConnect?.(connection as any);
-        } catch (error) {
-          console.error('WebSocket connect error:', error);
-        }
-        
-        return new Response(null, { status: 101, webSocket: client });
-      }
-
-      // Simple URL-based router
-      if (path.startsWith('/agent/my-agent/')) {
-        // Handler for CORE-001 & CORE-004
-        const agentId = path.split('/').pop()!;
-        const agent = await getAgentByName<WorkerEnv, MyAgent>(env.MY_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      if (path === '/rpc-hello') {
-        // Handler for CORE-002
-        const agent = await getAgentByName<WorkerEnv, MyAgent>(env.MY_AGENT, "my-unique-id");
-        const greeting = await agent.sayHello("World");
-        return new Response(greeting);
-      }
-
-      if (path === '/dispatch-task' && request.method === 'POST') {
-        // Handler for CORE-003
-        try {
-          const { url: taskUrl } = await request.json() as { url: string };
-          const supervisor = await getAgentByName<WorkerEnv, SupervisorAgent>(env.SUPERVISOR, "global-supervisor");
-          return supervisor.doComplexTask(taskUrl);
-        } catch (jsonError) {
-          return new Response("Invalid JSON payload", { status: 400 });
-        }
-      }
-
-      // State management agent routes
-      if (path.startsWith('/agent/history-agent/')) {
-        const agentId = path.split('/').pop()!;
-        const agent = await getAgentByName<WorkerEnv, HistoryAgent>(env.HISTORY_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      if (path.startsWith('/counter-agent/') || path.startsWith('/agent/counter-agent/')) {
-        const pathParts = path.split('/');
-        const agentId = path.startsWith('/agent/') ? pathParts[3] : pathParts[2]; // /agent/counter-agent/{id} or /counter-agent/{id}
-        const agent = await getAgentByName<WorkerEnv, CounterAgent>(env.COUNTER_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      if (path.startsWith('/agent/migrating-agent/')) {
-        const agentId = path.split('/').pop()!;
-        const agent = await getAgentByName<WorkerEnv, MigratingAgent>(env.MIGRATING_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      // Handle WebSocket upgrades for echo agent
-      if (path.startsWith('/echo-agent/') && request.headers.get('upgrade') === 'websocket') {
-        const pathParts = path.split('/');
-        const agentId = pathParts[2];
-        const agent = await getAgentByName<WorkerEnv, EchoAgent>(env.ECHO_AGENT, agentId);
-        
-        const webSocketPair = new WebSocketPair();
-        const [client, server] = Object.values(webSocketPair);
-        
-        server.accept();
-        
-        const connection = {
-          id: `conn-${Date.now()}`,
-          send: (message: string) => server.send(message),
-          close: () => server.close()
-        };
-        
-        server.addEventListener('message', async (event) => {
-          try {
-            await agent.onMessage(connection as any, event.data as string);
-          } catch (error) {
-            console.error('WebSocket message error:', error);
-          }
-        });
-        
-        server.addEventListener('close', async (event) => {
-          try {
-            await agent.onClose?.(connection as any, event.code || 1000, event.reason || '', event.wasClean || true);
-          } catch (error) {
-            console.error('WebSocket close error:', error);
-          }
-        });
-        
-        server.addEventListener('error', async (event) => {
-          try {
-            await agent.onError?.(connection as any, new Error('WebSocket error'));
-          } catch (error) {
-            console.error('WebSocket error handler error:', error);
-          }
-        });
-        
-        try {
-          await agent.onConnect?.(connection as any);
-        } catch (error) {
-          console.error('WebSocket connect error:', error);
-        }
-        
-        return new Response(null, { status: 101, webSocket: client });
-      }
-
-      // Handle WebSocket upgrades for chatty agent
-      if (path.startsWith('/chatty-agent/') && request.headers.get('upgrade') === 'websocket') {
-        const pathParts = path.split('/');
-        const agentId = pathParts[2];
-        const agent = await getAgentByName<WorkerEnv, ChattyAgent>(env.CHATTY_AGENT, agentId);
-        
-        const webSocketPair = new WebSocketPair();
-        const [client, server] = Object.values(webSocketPair);
-        
-        server.accept();
-        
-        const connection = {
-          id: `conn-${Date.now()}`,
-          send: (message: string) => server.send(message),
-          close: () => server.close(),
-          setState: (state: any) => { (connection as any).state = state; },
-          state: null
-        };
-        
-        server.addEventListener('message', async (event) => {
-          try {
-            await agent.onMessage(connection as any, event.data as string);
-          } catch (error) {
-            console.error('WebSocket message error:', error);
-          }
-        });
-        
-        return new Response(null, { status: 101, webSocket: client });
-      }
-
-      // Handle streaming agent
-      if (path.startsWith('/streaming-agent/')) {
-        const agentId = path.split('/').pop()!;
-        const agent = await getAgentByName<WorkerEnv, StreamingAgent>(env.STREAMING_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      // Handle reminder agent
-      if (path.startsWith('/agent/reminder-agent/')) {
-        const pathParts = path.split('/');
-        const agentId = pathParts[3];
-        const agent = await getAgentByName<WorkerEnv, ReminderAgent>(env.REMINDER_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      // Handle schedule manager agent
-      if (path.startsWith('/agent/schedule-manager-agent/')) {
-        const pathParts = path.split('/');
-        const agentId = pathParts[3];
-        const agent = await getAgentByName<WorkerEnv, ScheduleManagerAgent>(env.SCHEDULE_MANAGER_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      // Handle onboarding agent
-      if (path.startsWith('/agent/onboarding-agent/')) {
-        const pathParts = path.split('/');
-        const agentId = pathParts[3];
-        const agent = await getAgentByName<WorkerEnv, OnboardingAgent>(env.ONBOARDING_AGENT, agentId);
-        return agent.onRequest(request);
-      }
-
-      return new Response("Not Found", { status: 404 });
+      await (agent as any).onMessage(connection as any, event.data as string);
     } catch (error) {
-      console.error('Worker error:', error);
-      return new Response("Internal Server Error", { status: 500 });
+      console.error('WebSocket message error:', error);
     }
-  },
-};
+  });
+  
+  server.addEventListener('close', async (event) => {
+    try {
+      await (agent as any).onClose?.(connection as any, event.code || 1000, event.reason || '', event.wasClean || true);
+    } catch (error) {
+      console.error('WebSocket close error:', error);
+    }
+  });
+  
+  server.addEventListener('error', async (event) => {
+    try {
+      await (agent as any).onError?.(connection as any, new Error('WebSocket error'));
+    } catch (error) {
+      console.error('WebSocket error handler error:', error);
+    }
+  });
+  
+  try {
+    await (agent as any).onConnect?.(connection as any);
+  } catch (error) {
+    console.error('WebSocket connect error:', error);
+  }
+  
+  return new Response(null, { status: 101, webSocket: client });
+}
+
+// WebSocket routes
+app.get('/counter-agent/:id', async (c) => {
+  if (c.req.header('upgrade') === 'websocket') {
+    const agentId = c.req.param('id');
+    return setupWebSocket(c.env, c.env.COUNTER_AGENT, agentId, CounterAgent);
+  }
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.get('/agent/counter-agent/:id', async (c) => {
+  if (c.req.header('upgrade') === 'websocket') {
+    const agentId = c.req.param('id');
+    return setupWebSocket(c.env, c.env.COUNTER_AGENT, agentId, CounterAgent);
+  }
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.get('/echo-agent/:id', async (c) => {
+  if (c.req.header('upgrade') === 'websocket') {
+    const agentId = c.req.param('id');
+    return setupWebSocket(c.env, c.env.ECHO_AGENT, agentId, EchoAgent);
+  }
+  return new Response("Not Found", { status: 404 });
+});
+
+app.get('/chatty-agent/:id', async (c) => {
+  if (c.req.header('upgrade') === 'websocket') {
+    const agentId = c.req.param('id');
+    return setupWebSocket(c.env, c.env.CHATTY_AGENT, agentId, ChattyAgent);
+  }
+  return new Response("Not Found", { status: 404 });
+});
+
+// Core API routes
+app.get('/agent/my-agent/:id', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, MyAgent>(c.env.MY_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.get('/rpc-hello', async (c) => {
+  const agent = await getAgentByName<WorkerEnv, MyAgent>(c.env.MY_AGENT, "my-unique-id");
+  const greeting = await agent.sayHello("World");
+  return new Response(greeting);
+});
+
+app.post('/dispatch-task', async (c) => {
+  try {
+    const { url: taskUrl } = await c.req.json() as { url: string };
+    const supervisor = await getAgentByName<WorkerEnv, SupervisorAgent>(c.env.SUPERVISOR, "global-supervisor");
+    return supervisor.doComplexTask(taskUrl);
+  } catch (jsonError) {
+    return new Response("Invalid JSON payload", { status: 400 });
+  }
+});
+
+// State management agents
+app.all('/agent/history-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, HistoryAgent>(c.env.HISTORY_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.all('/counter-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.all('/agent/counter-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, CounterAgent>(c.env.COUNTER_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.all('/agent/migrating-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, MigratingAgent>(c.env.MIGRATING_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.all('/streaming-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, StreamingAgent>(c.env.STREAMING_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+// Orchestration agents
+app.all('/agent/reminder-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, ReminderAgent>(c.env.REMINDER_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.all('/agent/schedule-manager-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, ScheduleManagerAgent>(c.env.SCHEDULE_MANAGER_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+app.all('/agent/onboarding-agent/:id/*', async (c) => {
+  const agentId = c.req.param('id');
+  const agent = await getAgentByName<WorkerEnv, OnboardingAgent>(c.env.ONBOARDING_AGENT, agentId);
+  return agent.onRequest(c.req.raw);
+});
+
+// Custom 404 handler to match original behavior
+app.notFound((c) => {
+  return new Response("Not Found", { status: 404 });
+});
+
+// Error handler to match original behavior
+app.onError((err, c) => {
+  console.error('Worker error:', err);
+  return new Response("Internal Server Error", { status: 500 });
+});
+
+export default app;
 
 // Re-export Agent classes for wrangler.jsonc to find them
 export { MyAgent } from './agents/MyAgent';

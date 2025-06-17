@@ -24,6 +24,13 @@ vi.mock('agents', () => {
         if (query.includes('INSERT')) {
           return undefined;
         }
+        if (query.includes('SELECT') && query.includes('tracked_workflows')) {
+          return [{
+            id: 'onboarding-user-123',
+            status: 'started',
+            started_at: new Date().toISOString()
+          }];
+        }
         if (query.includes('SELECT')) {
           return [{ value: 0 }];
         }
@@ -88,7 +95,7 @@ describe('Orchestration and Autonomy Features', () => {
       expect(response.status).toBe(200);
       
       const body = await response.json();
-      expect(body.status).toBe('Reminder set!');
+      expect(body.status).toBe('Resilient reminder set!');
       expect(body.taskId).toBeDefined();
     });
 
@@ -212,7 +219,7 @@ describe('Orchestration and Autonomy Features', () => {
       expect(response.status).toBe(409);
       
       const body = await response.json();
-      expect(body.error).toBe('A follow-up is already scheduled.');
+      expect(body.status).toBe('A follow-up is already scheduled.');
       expect(body.currentTaskId).toBe('existing-task-id');
     });
 
@@ -240,7 +247,7 @@ describe('Orchestration and Autonomy Features', () => {
       expect(response.status).toBe(404);
       
       const body = await response.json();
-      expect(body.error).toBe('No task to cancel.');
+      expect(body.status).toBe('No task to cancel.');
     });
 
     it('should handle failed task cancellation', async () => {
@@ -319,7 +326,7 @@ describe('Orchestration and Autonomy Features', () => {
       expect(response.status).toBe(202);
       
       const body = await response.json();
-      expect(body.status).toBe('Onboarding workflow triggered');
+      expect(body.status).toBe('Workflow triggered.');
       expect(body.instanceId).toBe('onboarding-user-123');
       
       expect(mockEnv.EMAIL_WORKFLOW.create).toHaveBeenCalledWith({
@@ -385,6 +392,44 @@ describe('Orchestration and Autonomy Features', () => {
 
       const response = await agent.onRequest(request);
       expect(response.status).toBe(404);
+    });
+
+    it('should return tracked workflows via get-tracked endpoint', async () => {
+      const agent = new OnboardingAgent({}, mockEnv);
+      const request = new Request('http://test.com/get-tracked', {
+        method: 'GET'
+      });
+
+      const response = await agent.onRequest(request);
+      expect(response.status).toBe(200);
+      
+      const body = await response.json();
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(1);
+      expect(body[0]).toEqual({
+        id: 'onboarding-user-123',
+        status: 'started',
+        started_at: expect.any(String)
+      });
+    });
+
+    it('should handle SQL query errors in get-tracked endpoint', async () => {
+      const agent = new OnboardingAgent({}, mockEnv);
+      
+      // Mock SQL to throw an error
+      agent.sql = vi.fn(() => {
+        throw new Error('Database error');
+      });
+      
+      const request = new Request('http://test.com/get-tracked', {
+        method: 'GET'
+      });
+
+      const response = await agent.onRequest(request);
+      expect(response.status).toBe(500);
+      
+      const body = await response.json();
+      expect(body.error).toBe('Failed to retrieve tracked workflows');
     });
   });
 });

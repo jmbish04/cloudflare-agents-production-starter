@@ -39,6 +39,10 @@ export class OnboardingAgent extends Agent<WorkerEnv> {
       }
     }
 
+    if (method === 'GET' && url.pathname.endsWith('/get-tracked')) {
+      return this.getTrackedWorkflows();
+    }
+
     return new Response('Not Found', { status: 404 });
   }
 
@@ -65,7 +69,7 @@ export class OnboardingAgent extends Agent<WorkerEnv> {
       }));
 
       return new Response(JSON.stringify({
-        status: 'Onboarding workflow triggered',
+        status: 'Workflow triggered.',
         instanceId: instance.id
       }), {
         status: 202,
@@ -87,6 +91,40 @@ export class OnboardingAgent extends Agent<WorkerEnv> {
 
       return new Response(JSON.stringify({
         error: 'Failed to start workflow'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
+  async getTrackedWorkflows(): Promise<Response> {
+    try {
+      const workflows = await this.sql`
+        SELECT id, status, started_at 
+        FROM tracked_workflows 
+        ORDER BY started_at DESC
+      `;
+
+      return new Response(JSON.stringify(workflows), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } catch (error) {
+      console.error(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        agentClass: 'OnboardingAgent',
+        agentId: this.name,
+        eventType: 'sql.query_failed',
+        level: 'error',
+        message: 'Failed to get tracked workflows',
+        data: { 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        }
+      }));
+
+      return new Response(JSON.stringify({
+        error: 'Failed to retrieve tracked workflows'
       }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
