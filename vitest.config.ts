@@ -14,7 +14,8 @@ export default defineConfig({
     pool: '@cloudflare/vitest-pool-workers',
     poolOptions: {
       workers: {
-        wrangler: { configPath: './wrangler.jsonc' }
+        wrangler: { configPath: './wrangler.jsonc' },
+        isolatedStorage: false
       }
     }
   },
