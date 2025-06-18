@@ -1,6 +1,7 @@
 import type { WorkerEnv } from './types';
 
-export async function handleAuthDefault(request: Request, env: WorkerEnv): Promise<Response> {
+export const handleAuthDefault = {
+  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
   const url = new URL(request.url);
   
   // Handle the root OAuth path
@@ -31,7 +32,8 @@ export async function handleAuthDefault(request: Request, env: WorkerEnv): Promi
   
   // Default 404 for unhandled paths
   return new Response('Not found', { status: 404 });
-}
+  }
+};
 
 function getLoginPageHTML(): string {
   return `
