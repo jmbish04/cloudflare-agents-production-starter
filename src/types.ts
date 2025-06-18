@@ -28,6 +28,7 @@ import type { ResilientChatAgent } from './agents/ResilientChatAgent';
 import type { HITLAgent } from './agents/HITLAgent';
 import type { StatefulCalculatorAgent } from './agents/StatefulCalculatorAgent';
 import type { PersistentCounterAgent } from './agents/PersistentCounterAgent';
+import type { AdminAgent } from './agents/AdminAgent';
 
 export interface CounterState {
   counter: number;
@@ -92,6 +93,9 @@ export interface WorkerEnv {
   STATEFUL_CALCULATOR_AGENT: AgentNamespace<StatefulCalculatorAgent>;
   PERSISTENT_COUNTER_AGENT: AgentNamespace<PersistentCounterAgent>;
   
+  // Admin agent
+  ADMIN_AGENT: AgentNamespace<AdminAgent>;
+  
   // AI services
   AI: Ai;
   VECTOR_DB: VectorizeIndex;
@@ -104,6 +108,7 @@ export interface WorkerEnv {
   OPENAI_API_KEY: string;
   GITHUB_API_TOKEN: string;
   MY_LOCAL_SECRET: string;
+  ADMIN_SECRET_KEY: string;
 }
 
 export interface GitHubRepoDTO {

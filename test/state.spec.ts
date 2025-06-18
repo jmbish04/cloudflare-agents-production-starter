@@ -206,7 +206,7 @@ describe('State Management Agents', () => {
     it('should create metadata table on start', async () => {
       await agent.onStart();
       expect((agent as any).sqlQueries).toContainEqual({
-        query: 'CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value INTEGER)',
+        query: 'CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT)',
         values: []
       });
     });
@@ -240,11 +240,8 @@ describe('State Management Agents', () => {
       (agent as any).sql = () => { throw new Error('Migration failed'); };
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
-      await agent.onStart();
-      expect((agent as any).migrationFailed).toBe(true);
-      
-      // Should throw error when trying to use agent
-      await expect(agent.addUser('user1', 'Test')).rejects.toThrow('migration failure');
+      // onStart should throw InstanceLockedError on migration failure
+      await expect(agent.onStart()).rejects.toThrow('Migration failed');
       
       consoleSpy.mockRestore();
     });
@@ -262,7 +259,14 @@ describe('State Management Agents', () => {
     });
 
     it('should return 503 when migration failed', async () => {
-      (agent as any).migrationFailed = true;
+      // Mock SQL to return failed status
+      (agent as any).sql = vi.fn().mockImplementation((query) => {
+        if (query.toString().includes('SELECT value FROM _meta WHERE key = \'migration_status\'')) {
+          return [{ value: 'failed' }];
+        }
+        return [];
+      });
+      
       const request = new Request('http://test.com', { method: 'GET' });
       
       const response = await agent.onRequest(request);

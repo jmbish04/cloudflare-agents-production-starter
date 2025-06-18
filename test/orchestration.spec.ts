@@ -86,13 +86,13 @@ describe('Orchestration and Autonomy Features', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: 'Test reminder',
-          delaySeconds: 30,
-          failFor: 0
+          failFor: 0,
+          maxRetries: 3
         })
       });
 
       const response = await agent.onRequest(request);
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(202);
       
       const body = await response.json();
       expect(body.status).toBe('Resilient reminder set!');
@@ -134,14 +134,16 @@ describe('Orchestration and Autonomy Features', () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await agent.sendReminder({
-        message: 'Test message',
-        delaySeconds: 10,
-        failFor: 2,
-        retryCount: 2 // At failFor limit, should succeed
+        data: {
+          message: 'Test message',
+          failFor: 2
+        },
+        retryCount: 2, // At failFor limit, should succeed
+        maxRetries: 3
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('SUCCESS: Reminder sent: Test message')
+        expect.stringContaining('TaskSucceeded')
       );
       consoleSpy.mockRestore();
     });
@@ -150,48 +152,58 @@ describe('Orchestration and Autonomy Features', () => {
       const agent = new ReminderAgent({}, mockEnv);
       const scheduleRetry = vi.spyOn(agent, 'schedule');
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await agent.sendReminder({
-        message: 'Test message',
-        delaySeconds: 10,
-        failFor: 3,
-        retryCount: 1 // Will fail and schedule retry
+        data: {
+          message: 'Test message',
+          failFor: 3
+        },
+        retryCount: 1, // Will fail and schedule retry
+        maxRetries: 5
       });
 
       expect(scheduleRetry).toHaveBeenCalledWith(
-        40, // 2^2 * 10 = 40 seconds
+        20, // 2^1 * 10 = 20 seconds (retryCount is 1)
         'sendReminder',
         expect.objectContaining({
-          message: 'Test message',
+          data: expect.objectContaining({
+            message: 'Test message'
+          }),
           retryCount: 2
         })
       );
       
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Task failed: Intentionally failing')
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('TaskFailed')
       );
       
       consoleErrorSpy.mockRestore();
+      consoleSpy.mockRestore();
     });
 
     it('should stop retrying after max attempts', async () => {
       const agent = new ReminderAgent({}, mockEnv);
       const scheduleRetry = vi.spyOn(agent, 'schedule');
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await agent.sendReminder({
-        message: 'Test message',
-        delaySeconds: 10,
-        failFor: 10,
-        retryCount: 5 // At max retry limit
+        data: {
+          message: 'Test message',
+          failFor: 10
+        },
+        retryCount: 5, // At max retry limit
+        maxRetries: 5
       });
 
       expect(scheduleRetry).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Max retries exceeded')
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('TaskAborted')
       );
       
       consoleErrorSpy.mockRestore();
+      consoleSpy.mockRestore();
     });
   });
 

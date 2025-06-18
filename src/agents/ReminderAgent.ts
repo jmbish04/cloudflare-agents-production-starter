@@ -1,6 +1,7 @@
 import { Agent } from 'agents';
 import type { WorkerEnv } from '../types';
 import { AgentLogger } from '../utils/logger';
+import { ExponentialBackoff, type RetryPayload } from '../utils/retry';
 
 export interface SetReminderRequest {
   message: string;
@@ -8,14 +9,15 @@ export interface SetReminderRequest {
   maxRetries: number;
 }
 
-export interface ResilientTaskPayload {
+export interface ReminderTaskData {
   message: string;
   failFor: number;
-  maxRetries: number;
-  retryCount: number;
 }
 
+export type ResilientTaskPayload = RetryPayload<ReminderTaskData>;
+
 export class ReminderAgent extends Agent<WorkerEnv> {
+  private retryBackoff = new ExponentialBackoff();
   async onRequest(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method;
@@ -49,16 +51,18 @@ export class ReminderAgent extends Agent<WorkerEnv> {
   }
 
   async setReminder(data: SetReminderRequest) {
-    const payload: ResilientTaskPayload = {
-      ...data,
-      retryCount: 0,
+    const taskData: ReminderTaskData = {
+      message: data.message,
+      failFor: data.failFor
     };
+    const payload = this.retryBackoff.createRetryPayload(taskData, data.maxRetries);
     const { id } = await this.schedule(1, "sendReminder", payload);
     return { status: "Resilient reminder set!", taskId: id };
   }
 
   async sendReminder(payload: ResilientTaskPayload) {
-    const { message, failFor, maxRetries, retryCount } = payload;
+    const { data, retryCount, maxRetries } = payload;
+    const { message, failFor } = data;
     const logger = new AgentLogger('ReminderAgent', this.name);
 
     try {
@@ -69,11 +73,15 @@ export class ReminderAgent extends Agent<WorkerEnv> {
     } catch (e) {
       logger.warn('TaskFailed', `Attempt #${retryCount + 1} failed for reminder '${message}'.`, { error: e instanceof Error ? e.message : 'Unknown error' });
 
-      if (retryCount < maxRetries) {
-        const nextRetryCount = retryCount + 1;
-        const delayInSeconds = Math.pow(2, retryCount) * 10;
-        logger.info('TaskRetrying', `Scheduling retry #${nextRetryCount} in ${delayInSeconds}s.`);
-        await this.schedule(delayInSeconds, "sendReminder", { ...payload, retryCount: nextRetryCount });
+      const retryResult = this.retryBackoff.getRetryResult(retryCount, maxRetries);
+      
+      if (retryResult.shouldRetry) {
+        logger.info('TaskRetrying', `Scheduling retry #${retryResult.nextRetryCount} in ${retryResult.delay}s.`);
+        const nextPayload: ResilientTaskPayload = {
+          ...payload,
+          retryCount: retryResult.nextRetryCount
+        };
+        await this.schedule(retryResult.delay, "sendReminder", nextPayload);
       } else {
         logger.error('TaskAborted', `Reminder '${message}' has failed maximum retries (${maxRetries}) and is being aborted.`);
       }

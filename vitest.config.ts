@@ -8,14 +8,12 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**', 
       '**/dist/**', 
-      '**/.{idea,git,cache,output,temp}/**',
-      'test/unit/**' // Exclude unit tests that need Cloudflare runtime
+      '**/.{idea,git,cache,output,temp}/**'
     ],
-    pool: '@cloudflare/vitest-pool-workers',
+    pool: 'forks',
     poolOptions: {
-      workers: {
-        wrangler: { configPath: './wrangler.jsonc' },
-        isolatedStorage: false
+      forks: {
+        isolate: true
       }
     }
   },

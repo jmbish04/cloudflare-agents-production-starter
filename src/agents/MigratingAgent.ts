@@ -67,6 +67,63 @@ export class MigratingAgent extends Agent<WorkerEnv, {}> {
     return await this.sql`SELECT * FROM users ORDER BY id`;
   }
 
+  /**
+   * Admin method to force unlock a locked agent instance.
+   * WARNING: This bypasses migration failure protection and should only be used
+   * by authorized administrators after investigating the root cause.
+   */
+  async _forceUnlock(): Promise<{ success: boolean; message: string }> {
+    try {
+      await this.sql`UPDATE _meta SET value = 'ok' WHERE key = 'migration_status'`;
+      return { 
+        success: true, 
+        message: `Agent ${this.name} has been force unlocked. Please verify data integrity.` 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        message: `Failed to unlock agent: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
+  }
+
+  /**
+   * Admin method to rerun migrations from the beginning.
+   * WARNING: This will drop all existing data and recreate schema.
+   * Only use after backing up critical data.
+   */
+  async _rerunMigration(): Promise<{ success: boolean; message: string; version?: number }> {
+    try {
+      // Clear migration failure status first
+      await this.sql`UPDATE _meta SET value = 'ok' WHERE key = 'migration_status'`;
+      
+      // Drop existing tables (except _meta)
+      await this.sql`DROP TABLE IF EXISTS users`;
+      
+      // Reset version to force re-migration
+      await this.sql`UPDATE _meta SET value = 0 WHERE key = 'version'`;
+      
+      // Re-run migrations
+      await this.onStart();
+      
+      const result = await this.sql`SELECT value FROM _meta WHERE key = 'version'`;
+      const version = result.length > 0 ? (result[0].value as number) : 0;
+      
+      return { 
+        success: true, 
+        message: `Migration completed successfully for agent ${this.name}`,
+        version
+      };
+    } catch (error) {
+      // If rerun fails, mark as failed again
+      await this.sql`UPDATE _meta SET value = 'failed' WHERE key = 'migration_status'`;
+      return { 
+        success: false, 
+        message: `Migration rerun failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
+  }
+
   async onRequest(request: Request): Promise<Response> {
     try {
       await this.assertOperational();

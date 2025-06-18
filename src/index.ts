@@ -32,6 +32,7 @@ import { SecretAgent } from './agents/SecretAgent';
 import { WebSocketStreamingAgent } from './agents/WebSocketStreamingAgent';
 import { HttpEchoAgent } from './agents/HttpEchoAgent';
 import { ResilientChatAgent } from './agents/ResilientChatAgent';
+import { AdminAgent } from './agents/AdminAgent';
 import { handleAuthDefault } from './auth-handler';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv, BrowserRequestPayload } from './types';
@@ -279,6 +280,12 @@ app.post('/tool/browser/title', async (c) => {
     : c.json({ error: "Failed to retrieve page title." }, 500);
 });
 
+// Admin agent for manual recovery operations
+app.post('/admin/recovery', async (c) => {
+  const agent = await getAgentByName<WorkerEnv, AdminAgent>(c.env.ADMIN_AGENT, 'admin-singleton');
+  return agent.onRequest(c.req.raw);
+});
+
 // Prefixed API routes (v1 namespace)
 apiV1.get('/echo-agent/:id', createAgentRoute('ECHO_AGENT', EchoAgent, true));
 apiV1.get('/counter-agent/:id', createAgentRoute('COUNTER_AGENT', CounterAgent, true));
@@ -366,3 +373,4 @@ export { SecretAgent } from './agents/SecretAgent';
 export { WebSocketStreamingAgent } from './agents/WebSocketStreamingAgent';
 export { HttpEchoAgent } from './agents/HttpEchoAgent';
 export { ResilientChatAgent } from './agents/ResilientChatAgent';
+export { AdminAgent } from './agents/AdminAgent';

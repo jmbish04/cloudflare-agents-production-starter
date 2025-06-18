@@ -124,6 +124,10 @@
       {
         "name": "RESILIENT_CHAT_AGENT",
         "class_name": "ResilientChatAgent"
+      },
+      {
+        "name": "ADMIN_AGENT",
+        "class_name": "AdminAgent"
       }
     ]
   },
