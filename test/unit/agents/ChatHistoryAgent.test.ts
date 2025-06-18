@@ -356,8 +356,8 @@ describe('ChatHistoryAgent', () => {
 
     describe('error handling', () => {
       it('should handle SQL errors gracefully', async () => {
-        // Mock SQL to throw an error
-        agent.sql = vi.fn().mockImplementation(() => {
+        // Mock getHistory to throw an error
+        agent.getHistory = vi.fn().mockImplementation(() => {
           throw new Error('Database connection failed');
         });
 

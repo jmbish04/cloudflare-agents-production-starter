@@ -33,6 +33,7 @@ export class ChatHistoryAgent extends Agent<WorkerEnv, ChatHistoryAgentState> {
       RETURNING id, role, content, createdAt
     ` as ChatMessage[];
 
+    // setState automatically broadcasts to all connected clients
     this.setState({ lastMessageTimestamp: Date.now() });
     
     return result;
