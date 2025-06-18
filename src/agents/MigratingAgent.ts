@@ -1,14 +1,13 @@
 import { Agent } from "agents";
 import type { WorkerEnv } from "../types";
+import { InstanceLockedError } from "../utils/errors";
 
 const LATEST_SCHEMA_VERSION = 2;
 
 export class MigratingAgent extends Agent<WorkerEnv, {}> {
-  private migrationFailed = false;
-
   async onStart(): Promise<void> {
     try {
-      await this.sql`CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value INTEGER)`;
+      await this.sql`CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT)`;
       
       const result = await this.sql`SELECT value FROM _meta WHERE key = 'version'`;
       const version = result.length > 0 ? (result[0].value as number) : 0;
@@ -25,21 +24,24 @@ export class MigratingAgent extends Agent<WorkerEnv, {}> {
         await this.sql`UPDATE _meta SET value = 2 WHERE key = 'version'`;
       }
 
+      await this.sql`INSERT INTO _meta (key, value) VALUES ('migration_status', 'ok') ON CONFLICT(key) DO UPDATE SET value = 'ok'`;
       console.log(`Agent ${this.name} is at schema version ${LATEST_SCHEMA_VERSION}`);
     } catch (error) {
-      console.error(`Migration failed for agent ${this.name}:`, error);
-      this.migrationFailed = true;
+      console.error(`MIGRATION FAILED for agent ${this.name}:`, error);
+      await this.sql`INSERT INTO _meta (key, value) VALUES ('migration_status', 'failed') ON CONFLICT(key) DO UPDATE SET value = 'failed'`;
+      throw new InstanceLockedError(this.name, `Initial migration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  private checkMigrationStatus(): void {
-    if (this.migrationFailed) {
-      throw new Error('Agent is locked due to migration failure. Manual intervention required.');
+  private async assertOperational(): Promise<void> {
+    const meta = await this.sql`SELECT value FROM _meta WHERE key = 'migration_status'`;
+    if (meta?.[0]?.value === 'failed') {
+      throw new InstanceLockedError(this.name);
     }
   }
 
   async addUser(id: string, name: string, email?: string): Promise<void> {
-    this.checkMigrationStatus();
+    await this.assertOperational();
     
     // Validate inputs
     if (typeof id !== 'string' || id.trim().length === 0) {
@@ -61,13 +63,13 @@ export class MigratingAgent extends Agent<WorkerEnv, {}> {
   }
 
   async getUsers(): Promise<any[]> {
-    this.checkMigrationStatus();
+    await this.assertOperational();
     return await this.sql`SELECT * FROM users ORDER BY id`;
   }
 
   async onRequest(request: Request): Promise<Response> {
     try {
-      this.checkMigrationStatus();
+      await this.assertOperational();
       
       if (request.method === 'POST') {
         let body: { id?: string; name?: string; email?: string };
@@ -104,7 +106,7 @@ export class MigratingAgent extends Agent<WorkerEnv, {}> {
       });
     } catch (error) {
       console.error('MigratingAgent onRequest error:', error);
-      if (error instanceof Error && error.message.includes('migration failure')) {
+      if (error instanceof InstanceLockedError) {
         return new Response('Agent unavailable due to migration failure', { status: 503 });
       }
       return new Response('Internal server error', { status: 500 });

@@ -1,10 +1,17 @@
 import { Agent } from 'agents';
 import type { WorkerEnv } from '../types';
+import { AgentLogger } from '../utils/logger';
 
-export interface ReminderPayload {
+export interface SetReminderRequest {
   message: string;
-  delaySeconds: number;
   failFor: number;
+  maxRetries: number;
+}
+
+export interface ResilientTaskPayload {
+  message: string;
+  failFor: number;
+  maxRetries: number;
   retryCount: number;
 }
 
@@ -15,8 +22,8 @@ export class ReminderAgent extends Agent<WorkerEnv> {
 
     if (method === 'POST' && url.pathname.endsWith('/set')) {
       try {
-        const body = await request.json() as any;
-        const { message, delaySeconds = 10, failFor = 0 } = body;
+        const body = await request.json() as SetReminderRequest;
+        const { message, failFor, maxRetries } = body;
 
         if (!message || typeof message !== 'string') {
           return new Response(JSON.stringify({ error: 'Invalid message' }), {
@@ -25,17 +32,9 @@ export class ReminderAgent extends Agent<WorkerEnv> {
           });
         }
 
-        const taskId = await this.schedule(delaySeconds, 'sendReminder', {
-          message,
-          delaySeconds,
-          failFor,
-          retryCount: 0
-        });
-
-        return new Response(JSON.stringify({
-          status: 'Resilient reminder set!',
-          taskId
-        }), {
+        const result = await this.setReminder({ message, failFor, maxRetries });
+        return new Response(JSON.stringify(result), {
+          status: 202,
           headers: { 'Content-Type': 'application/json' }
         });
       } catch (error) {
@@ -49,68 +48,35 @@ export class ReminderAgent extends Agent<WorkerEnv> {
     return new Response('Not Found', { status: 404 });
   }
 
-  async sendReminder(data: ReminderPayload): Promise<void> {
-    const logMessage = JSON.stringify({
-      timestamp: new Date().toISOString(),
-      agentClass: 'ReminderAgent',
-      agentId: this.name,
-      eventType: 'reminder.attempt',
-      level: 'info',
-      message: `Reminder attempt ${data.retryCount + 1}`,
-      data: { message: data.message, retryCount: data.retryCount, failFor: data.failFor }
-    });
+  async setReminder(data: SetReminderRequest) {
+    const payload: ResilientTaskPayload = {
+      ...data,
+      retryCount: 0,
+    };
+    const { id } = await this.schedule(1, "sendReminder", payload);
+    return { status: "Resilient reminder set!", taskId: id };
+  }
+
+  async sendReminder(payload: ResilientTaskPayload) {
+    const { message, failFor, maxRetries, retryCount } = payload;
+    const logger = new AgentLogger('ReminderAgent', this.name);
 
     try {
-      if (data.retryCount < data.failFor) {
-        throw new Error(`Intentionally failing (attempt ${data.retryCount + 1})`);
+      if (retryCount < failFor) {
+        throw new Error(`Intentionally failing for test purposes. Attempt #${retryCount + 1}.`);
       }
+      logger.info('TaskSucceeded', `Reminder '${message}' sent successfully.`);
+    } catch (e) {
+      logger.warn('TaskFailed', `Attempt #${retryCount + 1} failed for reminder '${message}'.`, { error: e instanceof Error ? e.message : 'Unknown error' });
 
-      console.log(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        agentClass: 'ReminderAgent',
-        agentId: this.name,
-        eventType: 'reminder.success',
-        level: 'info',
-        message: `SUCCESS: Reminder sent: ${data.message}`,
-        data: { message: data.message, finalRetryCount: data.retryCount }
-      }));
-
-    } catch (error) {
-      const nextRetryCount = data.retryCount + 1;
-      
-      console.error(JSON.stringify({
-        timestamp: new Date().toISOString(),
-        agentClass: 'ReminderAgent',
-        agentId: this.name,
-        eventType: 'reminder.failed',
-        level: 'error',
-        message: `Task failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        data: { 
-          message: data.message, 
-          retryCount: data.retryCount, 
-          nextRetryCount,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      }));
-
-      if (nextRetryCount > 5) {
-        console.error(JSON.stringify({
-          timestamp: new Date().toISOString(),
-          agentClass: 'ReminderAgent',
-          agentId: this.name,
-          eventType: 'reminder.max_retries_exceeded',
-          level: 'error',
-          message: 'Max retries exceeded for reminder. Aborting.',
-          data: { message: data.message, finalRetryCount: data.retryCount }
-        }));
-        return;
+      if (retryCount < maxRetries) {
+        const nextRetryCount = retryCount + 1;
+        const delayInSeconds = Math.pow(2, retryCount) * 10;
+        logger.info('TaskRetrying', `Scheduling retry #${nextRetryCount} in ${delayInSeconds}s.`);
+        await this.schedule(delayInSeconds, "sendReminder", { ...payload, retryCount: nextRetryCount });
+      } else {
+        logger.error('TaskAborted', `Reminder '${message}' has failed maximum retries (${maxRetries}) and is being aborted.`);
       }
-
-      const delay = Math.pow(2, nextRetryCount) * 10; // Exponential backoff: 20s, 40s, 80s...
-      await this.schedule(delay, 'sendReminder', {
-        ...data,
-        retryCount: nextRetryCount
-      });
     }
   }
 }

@@ -35,6 +35,7 @@ import { ResilientChatAgent } from './agents/ResilientChatAgent';
 import { handleAuthDefault } from './auth-handler';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv, BrowserRequestPayload } from './types';
+import { InstanceLockedError } from './utils/errors';
 
 const app = new Hono<{ Bindings: WorkerEnv; Variables: { traceId: string } }>();
 const apiV1 = new Hono<{ Bindings: WorkerEnv; Variables: { traceId: string } }>();
@@ -293,8 +294,17 @@ app.notFound((c) => {
 });
 
 app.onError((err, c) => {
-  console.error('Worker error:', err);
-  return new Response("Internal Server Error", { status: 500 });
+  if (err instanceof InstanceLockedError) {
+    const errorResponse = {
+      error: "Instance Locked",
+      message: err.message,
+      agentId: err.agentId,
+      timestamp: new Date().toISOString(),
+    };
+    return c.json(errorResponse, 503);
+  }
+  console.error('Unhandled Error:', err);
+  return c.json({ error: 'Internal Server Error', message: err.message }, 500);
 });
 
 // OAuth Provider temporarily disabled for testing
