@@ -20,6 +20,7 @@ import type { RoutingAgent } from './agents/RoutingAgent';
 import type { GitHubAgent } from './agents/GitHubAgent';
 import type { WebBrowserAgent } from './agents/WebBrowserAgent';
 import type { LoggingAgent } from './agents/LoggingAgent';
+import type { ChatHistoryAgent } from './agents/ChatHistoryAgent';
 
 export interface CounterState {
   counter: number;
@@ -65,6 +66,9 @@ export interface WorkerEnv {
   GITHUB_AGENT: AgentNamespace<GitHubAgent>;
   BROWSER_AGENT: AgentNamespace<WebBrowserAgent>;
   LOGGING_AGENT: AgentNamespace<LoggingAgent>;
+  
+  // Chat agents
+  CHAT_HISTORY_AGENT: AgentNamespace<ChatHistoryAgent>;
   
   // AI services
   AI: Ai;

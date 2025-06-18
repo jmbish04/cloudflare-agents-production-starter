@@ -26,6 +26,7 @@ import { StatefulCalculatorAgent } from './agents/StatefulCalculatorAgent';
 import { PersistentCounterAgent } from './agents/PersistentCounterAgent';
 import { SecureMcpAgent } from './agents/SecureMcpAgent';
 import { LoggingAgent } from './agents/LoggingAgent';
+import { ChatHistoryAgent } from './agents/ChatHistoryAgent';
 import { handleAuthDefault } from './auth-handler';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv, BrowserRequestPayload } from './types';
@@ -227,6 +228,9 @@ app.post('/agent/counter/:id', createAgentRoute('COUNTER_AGENT', CounterAgent));
 // Route for logging test
 app.get('/agent/logging/:id', createAgentRoute('LOGGING_AGENT', LoggingAgent));
 
+// Chat History agent routes
+app.all('/agent/chat-history-agent/:id/*', createAgentRoute('CHAT_HISTORY_AGENT', ChatHistoryAgent));
+
 // Tool agents
 app.post('/tool/github/:owner/:repo', async (c) => {
   const owner = c.req.param('owner');
@@ -332,3 +336,4 @@ export { StatefulCalculatorAgent } from './agents/StatefulCalculatorAgent';
 export { PersistentCounterAgent } from './agents/PersistentCounterAgent';
 export { SecureMcpAgent } from './agents/SecureMcpAgent';
 export { LoggingAgent } from './agents/LoggingAgent';
+export { ChatHistoryAgent } from './agents/ChatHistoryAgent';

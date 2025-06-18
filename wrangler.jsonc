@@ -104,6 +104,10 @@
       {
         "name": "LOGGING_AGENT",
         "class_name": "LoggingAgent"
+      },
+      {
+        "name": "CHAT_HISTORY_AGENT",
+        "class_name": "ChatHistoryAgent"
       }
     ]
   },
@@ -188,6 +192,12 @@
         "PersistentCounterAgent",
         "SecureMcpAgent",
         "LoggingAgent"
+      ]
+    },
+    {
+      "tag": "v9",
+      "new_sqlite_classes": [
+        "ChatHistoryAgent"
       ]
     }
   ]
