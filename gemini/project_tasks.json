@@ -1,0 +1,85 @@
+// Omniscraper: General-Purpose Intelligent Scraping + Research System
+{
+  "project": "Omniscraper",
+  "description": "A modular scraping and AI workflow orchestration platform powered by Cloudflare Agents, containerized browsers, Proxmox VMs, and Node-compatible Workers (via Anode). It supports natural language agent definition, durable orchestration, scheduled execution, Codex- and Gemini-driven workflows, and deep GitHub integration.",
+  "modules": [
+    {
+      "name": "orchestrator-worker",
+      "type": "cloudflare-agent-router",
+      "tasks": [
+        "Route requests to scrape, GitHub, or agent orchestrators",
+        "Spawn Task Agents for each job",
+        "Support OpenAPI schema attachment for dynamic agent tooling",
+        "Expose durable GitHub tools as model-callable agents"
+      ]
+    },
+    {
+      "name": "job-master-vm-control",
+      "type": "ws+python+vm",
+      "tasks": [
+        "Dispatch advanced scraping or GitHub CLI actions to Proxmox VM",
+        "Allow slash-commands like /git rebase or /cf-agent convert PRs to tasks",
+        "Connect job-master as a durable tool agent via OpenAPI interface"
+      ]
+    },
+    {
+      "name": "github-agent",
+      "type": "durable-agent",
+      "tasks": [
+        "Monitor PRs, stars, forks, and contributions",
+        "Respond to GitHub slash comments like /gemini review or /cf-agent create tasks",
+        "Upload files to GitHub via R2 staging to avoid base64 limits",
+        "Mirror frontend GitHub functionality via GraphQL and REST",
+        "Schedule repo polling, issue syncing, and Codex/Gemini actions"
+      ]
+    },
+    {
+      "name": "anode-static-agent",
+      "type": "cloudflare-anode-worker",
+      "tasks": [
+        "Run scraping logic directly in Worker via Node.js-compatible env",
+        "Use cheerio/axios for HTML parsing",
+        "Ideal for static targets like court listings or Redfin public views"
+      ]
+    },
+    {
+      "name": "frontend-ui",
+      "type": "shadcn+nextjs+useAgent",
+      "tasks": [
+        "Manage durable agents and GitHub integrations",
+        "Launch and monitor all workflows",
+        "Expose task flows visually using @jmbish04/workflow-live"
+      ]
+    }
+  ],
+  "exhibits": [
+    {
+      "name": "GitHub Agent Flows",
+      "description": "Durable agent-based GitHub integrations and flows.",
+      "flows": [
+        "/gemini review → triggers Gemini to review code in PR, comments returned",
+        "/cf-agent create tasks → parse all unresolved PR comments and generate ClickUp/issue tasks",
+        "/cf-agent run codex → generate tests for this PR",
+        "uploadFile(filename) → saves file to R2, then posts upload to GitHub avoiding base64 limits",
+        "schedulePolling(owner/repo) → fetches stars/forks/issues daily",
+        "/git stats → summarize my GitHub activity this month via GraphQL",
+        "/cf-agent trace workflow → returns visual of task agents related to a PR"
+      ]
+    }
+  ],
+  "integration": {
+    "mcpIntegration": true,
+    "sseSupport": true,
+    "openapiToolSchemaSupport": true,
+    "r2StagingForGitHubUploads": true,
+    "graphqlAndRestApiSupport": true,
+    "jobMasterAsTool": true
+  },
+  "entrypoints": [
+    "POST /run",
+    "POST /github/command",
+    "POST /job-master",
+    "GET /agent/:id/status",
+    "GET /workflow/:traceId"
+  ]
+}
