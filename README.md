@@ -10,6 +10,27 @@ Traditional serverless functions are stateless, making it difficult to build int
 
 This repository is designed to be the definitive starting point for any serious Agent-based development on Cloudflare.
 
+## MCP Tool
+
+An example Model Context Protocol (MCP) tool is bundled with the Worker. The tool exposes a `/mcp/run` endpoint that returns a greeting and serves as a template for more advanced edge-friendly MCP functionality.
+
+### Deploying to Cloudflare Workers
+
+1. Ensure `wrangler` is installed and authenticated with your Cloudflare account.
+2. Deploy the Worker using the provided `wrangler.toml`:
+
+```bash
+npm run deploy
+```
+
+### Running Tests
+
+Run the Worker-specific unit tests which execute inside a Miniflare-powered environment:
+
+```bash
+npm run test:worker
+```
+
 ## Key Features & Unique Selling Points
 
 This starter kit is not just a collection of code; it's an opinionated implementation of battle-tested architectural patterns.

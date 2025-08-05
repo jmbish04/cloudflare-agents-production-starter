@@ -37,6 +37,7 @@ import { handleAuthDefault } from './auth-handler';
 export type { WorkerEnv } from './types';
 import type { WorkerEnv, BrowserRequestPayload } from './types';
 import { InstanceLockedError } from './utils/errors';
+import { runMcpTool } from './mcp-tool';
 
 const app = new Hono<{ Bindings: WorkerEnv; Variables: { traceId: string } }>();
 const apiV1 = new Hono<{ Bindings: WorkerEnv; Variables: { traceId: string } }>();
@@ -183,7 +184,7 @@ app.get('/rpc-hello', async (c) => {
   return new Response(greeting);
 });
 
-app.post('/dispatch-task', async (c) => {
+  app.post('/dispatch-task', async (c) => {
   try {
     const { url: taskUrl } = await c.req.json() as { url: string };
     const supervisor = await getAgentByName<WorkerEnv, SupervisorAgent>(c.env.SUPERVISOR, "global-supervisor");
@@ -270,7 +271,7 @@ app.post('/tool/github/:owner/:repo', async (c) => {
     : c.json({ error: "Repository not found or API call failed." }, 404);
 });
 
-app.post('/tool/browser/title', async (c) => {
+  app.post('/tool/browser/title', async (c) => {
   const { url } = await c.req.json<BrowserRequestPayload>();
   const agent = await getAgentByName<WorkerEnv, WebBrowserAgent>(c.env.BROWSER_AGENT, `browser-tool-for-${url}`);
   const title = await agent.getPageTitle(url);
@@ -281,10 +282,17 @@ app.post('/tool/browser/title', async (c) => {
 });
 
 // Admin agent for manual recovery operations
-app.post('/admin/recovery', async (c) => {
-  const agent = await getAgentByName<WorkerEnv, AdminAgent>(c.env.ADMIN_AGENT, 'admin-singleton');
-  return agent.onRequest(c.req.raw);
-});
+  app.post('/admin/recovery', async (c) => {
+    const agent = await getAgentByName<WorkerEnv, AdminAgent>(c.env.ADMIN_AGENT, 'admin-singleton');
+    return agent.onRequest(c.req.raw);
+  });
+
+  // Minimal MCP tool endpoint
+  app.post('/mcp/run', async (c) => {
+    const { name } = await c.req.json<{ name: string }>();
+    const greeting = runMcpTool(name);
+    return c.json({ greeting });
+  });
 
 // Prefixed API routes (v1 namespace)
 apiV1.get('/echo-agent/:id', createAgentRoute('ECHO_AGENT', EchoAgent, true));
